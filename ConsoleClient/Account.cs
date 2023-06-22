@@ -1,4 +1,4 @@
-﻿using Generator.Attributes;
+﻿using DynamicsMapper.Abstractions;
 
 namespace ConsoleClient
 {

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Reflection.Metadata;
 using System.Text;
 
-namespace Generator
+namespace DynamicsMapper
 {
     class ScopeTracker : IDisposable
     {

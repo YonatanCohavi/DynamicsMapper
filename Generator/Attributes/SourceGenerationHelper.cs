@@ -4,18 +4,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Generator.Attributes
+namespace DynamicsMapper.Attributes
 {
     internal class SourceGenerationHelper
     {
-        public static ITypeSymbol GetTypeSymbol(IPropertySymbol propertySymbol, out bool nullable)
+        public static ITypeSymbol GetTypeSymbol(ITypeSymbol typeSymbol, out bool nullable)
         {
             ITypeSymbol type;
-            nullable = propertySymbol.NullableAnnotation == NullableAnnotation.Annotated;
-            if (nullable && propertySymbol.Type is INamedTypeSymbol namedType)
-                type = namedType.TypeArguments.FirstOrDefault() ?? propertySymbol.Type;
+            nullable = typeSymbol.NullableAnnotation == NullableAnnotation.Annotated;
+            if (nullable && typeSymbol is INamedTypeSymbol namedType)
+                type = namedType.TypeArguments.FirstOrDefault() ?? typeSymbol;
             else
-                type = propertySymbol.Type;
+                type = typeSymbol;
             return type;
         }
         public static string GenerateFieldTypeEnum()

@@ -1,33 +1,26 @@
-﻿using Microsoft.CodeAnalysis.CSharp.Syntax;
+﻿using DynamicsMapper.Abstractions;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Generator.Models
+namespace DynamicsMapper.Models
 {
-    public enum FieldType
-    {
-        Regular = 1,
-        Lookup = 2,
-        Money = 3,
-        Formatted = 4,
-        Options = 5,
-    }
+
     internal class FieldGenerationDetails
     {
-        public FieldType FieldType { get; set; } = FieldType.Regular;
-        public string SchemaName { get; set; }
-        public string? Target { get; set; }
-        public string PropertyName { get; set; }
-        public string PropertyType { get; set; }
-        public bool Nullable { get; set; }
+        public MappingType Mapping { get; }
+        public string SchemaName { get; }
+        public IPropertySymbol PropertySymbol { get; }
+        public string? Target { get; }
 
-        public FieldGenerationDetails(string logicalName, string propertyName, string propertyType, bool nullable)
+        public FieldGenerationDetails(string logicalName, IPropertySymbol propertySymbol, MappingType mapping = MappingType.Basic, string? target = null)
         {
             SchemaName = logicalName;
-            PropertyName = propertyName;
-            PropertyType = propertyType;
-            Nullable = nullable;
+            PropertySymbol = propertySymbol;
+            Mapping = mapping;
+            Target = target;
         }
     }
     internal class ClassGenerationDetails

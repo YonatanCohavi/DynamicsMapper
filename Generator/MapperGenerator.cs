@@ -1,6 +1,8 @@
-﻿using Generator.Attributes;
-using Generator.Extensions;
-using Generator.Models;
+﻿using DynamicsMapper.Abstractions;
+using DynamicsMapper.Attributes;
+using DynamicsMapper.Extentions;
+using DynamicsMapper.Helpers;
+using DynamicsMapper.Models;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -8,412 +10,321 @@ using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Data.SqlTypes;
 using System.Linq;
-using System.Text;
 
-namespace Generator
+namespace DynamicsMapper
 {
     [Generator]
     public class MapperGenerator : IIncrementalGenerator
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            GenerateClasses(context);
+            var classes = context.SyntaxProvider
+                .ForAttributeWithMetadataName(typeof(CrmEntityAttribute).FullName,
+                    static (s, _) => s is ClassDeclarationSyntax,
+                    static (ctx, _) => ctx.TargetNode as ClassDeclarationSyntax)
+                .Where(c => c is not null);
 
-            var provider = context.SyntaxProvider.CreateSyntaxProvider(
-                predicate: static (node, _) => IsAttributeNode(node),
-                transform: static (ctx, _) => GetGenerationAttribute(ctx))
-                .Where(static n => n is not null);
-
-            var compilation = context.CompilationProvider.Combine(provider.Collect());
-            context.RegisterSourceOutput(
-                compilation,
-                (spc, source) => Execute(spc, source.Left, source.Right!));
+            var compilationAndMappers = context.CompilationProvider.Combine(classes.Collect());
+            context.RegisterImplementationSourceOutput(compilationAndMappers,
+                static (spc, source) => Execute(source.Left, source.Right!, spc));
         }
 
-        private static void GenerateClasses(IncrementalGeneratorInitializationContext context)
+        private static void Execute(Compilation compilation, ImmutableArray<ClassDeclarationSyntax> mappers, SourceProductionContext ctx)
         {
-            context.RegisterPostInitializationOutput(ctx => ctx.AddSource(
-                "CrmEntityAttribute.g.cs",
-                SourceText.From(SourceGenerationHelper.GenerateCrmEntityAttribute(), Encoding.UTF8)));
+            if (mappers.IsDefaultOrEmpty)
+                return;
 
-            context.RegisterPostInitializationOutput(ctx => ctx.AddSource(
-                "CrmFieldAttribute.g.cs",
-                SourceText.From(SourceGenerationHelper.GenerateCrmFieldAttribute(), Encoding.UTF8)));
+            var crmEntityAttributeSymbol = compilation.GetTypeByMetadataName(typeof(CrmEntityAttribute).FullName);
+            var crmFieldAttributeSymbol = compilation.GetTypeByMetadataName(typeof(CrmFieldAttribute).FullName);
 
-            context.RegisterPostInitializationOutput(ctx => ctx.AddSource(
-                "CrmReferenceAttribute.g.cs",
-                SourceText.From(SourceGenerationHelper.GenerateCrmReferenceAttribute(), Encoding.UTF8)));
+            if (crmFieldAttributeSymbol == null)
+                return;
 
-            context.RegisterPostInitializationOutput(ctx => ctx.AddSource(
-                "CrmMoneyAttribute.g.cs",
-                SourceText.From(SourceGenerationHelper.GenerateCrmMoneyAttribute(), Encoding.UTF8)));
-            context.RegisterPostInitializationOutput(ctx => ctx.AddSource(
-               "CrmFormattedAttribute.g.cs",
-               SourceText.From(SourceGenerationHelper.GenerateCrmFormattedAttribute(), Encoding.UTF8)));
 
-            context.RegisterPostInitializationOutput(ctx => ctx.AddSource(
-               "CrmOptionsAttribute.g.cs",
-               SourceText.From(SourceGenerationHelper.GenerateCrmOptionsAttribute(), Encoding.UTF8)));
+            if (crmEntityAttributeSymbol == null)
+                return;
 
-            context.RegisterPostInitializationOutput(ctx => ctx.AddSource(
-                "FieldType.g.cs",
-                SourceText.From(SourceGenerationHelper.GenerateFieldTypeEnum(), Encoding.UTF8)));
-
-        }
-
-        private void Execute(SourceProductionContext context, Compilation compilation, ImmutableArray<ClassGenerationDetails> generationDetails)
-        {
-            foreach (var generationDetail in generationDetails)
+            foreach (var mapperSyntax in mappers.Distinct())
             {
+                var mapperModel = compilation.GetSemanticModel(mapperSyntax.SyntaxTree);
+                if (mapperModel.GetDeclaredSymbol(mapperSyntax) is not INamedTypeSymbol mapperSymbol)
+                    continue;
+                var crmAttributeData = mapperSymbol.GetAttribute(crmEntityAttributeSymbol).FirstOrDefault();
+                if (crmAttributeData is null)
+                    continue;
 
-                var attributes = ExtractAttributes(compilation, generationDetail.Class).ToList();
-                var duplicates = attributes.GroupBy(a => a.PropertyName).Where(g => g.Count() > 1).Select(a => a.Key);
-                if (duplicates.Any())
-                    throw new Exception($"{string.Join(",", duplicates)} in {generationDetail.Class.Identifier} has duplicate attributes");
+                var entityName = (string)crmAttributeData.ConstructorArguments[0].Value!;
+                var properties = mapperSymbol.GetMembers().OfType<IPropertySymbol>();
 
-                var @namespace = generationDetail.Class.GetParent<NamespaceDeclarationSyntax>()!.Name.ToString();
-                var className = generationDetail.Class.Identifier.ToString();
-                var columns = attributes.Select(a => $"\"{a.SchemaName}\"").Distinct().ToList();
-                var writer = new CodeWriter();
-                writer.AppendLine("// <auto-generated>");
-                writer.AppendLine("#nullable enable");
-                writer.AppendLine();
-                writer.AddUsing("Microsoft.Xrm.Sdk");
-                writer.AddUsing("Microsoft.Xrm.Sdk.Query");
-                writer.AppendLine();
-                var modelName = $"{char.ToLower(className[0])}{className.Substring(1)}";
-                var toEntityContent = new List<string>();
-                var toModelContent = new List<string>()
+                var generationDetails = ExtractAttributes(properties, crmFieldAttributeSymbol, ctx)
+                    .ToArray();
+                var className = mapperSyntax.Identifier.ValueText;
+                var classContent = GeneratePartialMapperClass(mapperSyntax, entityName, generationDetails, ctx);
+                ctx.AddSource($"{className}.g.cs", classContent);
+
+            }
+        }
+
+        private static string GeneratePartialMapperClass(ClassDeclarationSyntax mapperSyntax, string entityName, FieldGenerationDetails[] generationDetails, SourceProductionContext ctx)
+        {
+            var @namespace = mapperSyntax.GetParent<NamespaceDeclarationSyntax>()!.Name.ToString();
+            var className = mapperSyntax.Identifier.ValueText;
+            var columns = generationDetails.Select(a => $"\"{a.SchemaName}\"").Distinct().ToList();
+            var writer = new CodeWriter();
+            writer.AppendLine("// <auto-generated />");
+            writer.AppendLine("#nullable enable");
+            writer.AppendLine();
+            writer.AddUsing("Microsoft.Xrm.Sdk");
+            writer.AddUsing("Microsoft.Xrm.Sdk.Query");
+            writer.AppendLine();
+            var modelName = $"{char.ToLower(className[0])}{className.Substring(1)}";
+            var toEntityContent = new List<string>();
+            var toModelContent = new List<string>()
+            {
+                $"{modelName}.{className}Id = entity.Id;"
+            };
+            foreach (var attribute in generationDetails)
+            {
+                var mappings = GetMapperContent(modelName, attribute, ctx);
+                if (!mappings.HasValue)
+                    continue;
+                toEntityContent.Add(mappings.Value.ToEntity);
+                toModelContent.Add(mappings.Value.ToModel);
+            }
+            using (writer.BeginScope($"namespace {@namespace}"))
+            {
+                using (writer.BeginScope($"public partial class {className}"))
                 {
-                    $"{modelName}.{className}Id = entity.Id;"
-                };
-
-                foreach (var attribute in attributes)
-                {
-                    switch (attribute.FieldType)
+                    writer.AppendLine($"public static ColumnSet ColumnSet = new ColumnSet({string.Join(", ", columns)});");
+                    writer.AppendLine();
+                    writer.AppendLine($"public Guid {className}Id {{ get; set; }}");
+                    writer.AppendLine();
+                    using (writer.BeginScope($"public Entity ToEntity()"))
                     {
-                        case FieldType.Regular:
-                            toModelContent.Add($"{modelName}.{attribute.PropertyName} = entity.GetAttributeValue<{attribute.PropertyType}>(\"{attribute.SchemaName}\");");
-                            toEntityContent.Add($"entity[\"{attribute.SchemaName}\"] = {attribute.PropertyName};");
-                            break;
-                        case FieldType.Lookup:
-                            if (attribute.Nullable)
-                            {
-                                toEntityContent.Add($"entity[\"{attribute.SchemaName}\"] = {attribute.PropertyName}.HasValue ? new EntityReference(\"{attribute.Target}\", {attribute.PropertyName}.Value) : null;");
-                                toModelContent.Add($"{modelName}.{attribute.PropertyName} = entity.GetAttributeValue<EntityReference>(\"{attribute.SchemaName}\")?.Id;");
-                            }
-                            else
-                            {
-                                toModelContent.Add($"{modelName}.{attribute.PropertyName} = entity.GetAttributeValue<EntityReference>(\"{attribute.SchemaName}\")?.Id ?? Guid.Empty;");
-                                toEntityContent.Add($"entity[\"{attribute.SchemaName}\"] = new EntityReference(\"{attribute.Target}\", {attribute.PropertyName});");
-                            }
-                            break;
-                        case FieldType.Money:
-                            if (attribute.Nullable)
-                            {
-                                toEntityContent.Add($"entity[\"{attribute.SchemaName}\"] = {attribute.PropertyName}.HasValue ? new Money({attribute.PropertyName}.Value) : null;");
-                                toModelContent.Add($"{modelName}.{attribute.PropertyName} = entity.GetAttributeValue<Money>(\"{attribute.SchemaName}\")?.Value;");
-                            }
-                            else
-                            {
-                                toEntityContent.Add($"entity[\"{attribute.SchemaName}\"] = new Money({attribute.PropertyName});");
-                                toModelContent.Add($"{modelName}.{attribute.PropertyName} = entity.GetAttributeValue<Money>(\"{attribute.SchemaName}\")?.Value ?? 0m;");
-                            }
-                            break;
-                        case FieldType.Formatted:
-                            toModelContent.Add($"if (entity.FormattedValues.TryGetValue(\"{attribute.SchemaName}\", out var formatted{attribute.PropertyName}))");
-                            toModelContent.Add($"\t{modelName}.{attribute.PropertyName} = formatted{attribute.PropertyName};");
-                            break;
-                        case FieldType.Options:
-                            var isInt = attribute.PropertyType == "int" || attribute.PropertyType == "int?";
-                            string modelIntValue;
-                            if (isInt)
-                                modelIntValue = attribute.PropertyName;
-                            else
-                                modelIntValue = $"(int){attribute.PropertyName}";
-
-                            if (attribute.Nullable)
-                            {
-                                toEntityContent.Add($"entity[\"{attribute.SchemaName}\"] = {attribute.PropertyName}.HasValue ? new OptionSetValue({modelIntValue}.Value) : null;");
-                                toModelContent.Add($"{modelName}.{attribute.PropertyName} = ({attribute.PropertyType})(entity.GetAttributeValue<OptionSetValue>(\"{attribute.SchemaName}\")?.Value);");
-                            }
-                            else
-                            {
-                                toEntityContent.Add($"entity[\"{attribute.SchemaName}\"] = new OptionSetValue({modelIntValue});");
-                                toModelContent.Add($"{modelName}.{attribute.PropertyName} = ({attribute.PropertyType})(entity.GetAttributeValue<OptionSetValue>(\"{attribute.SchemaName}\")?.Value ?? 0);");
-                            }
-                            break;
-                        default:
-                            throw new Exception($"{attribute.FieldType} is not defined");
+                        writer.AppendLine($"var entity = new Entity(\"{entityName}\", {className}Id);");
+                        toEntityContent.ForEach(writer.AppendLine);
+                        writer.AppendLine("return entity;");
+                    }
+                    writer.AppendLine();
+                    using (writer.BeginScope($"public static {className} FromEntity(Entity entity)"))
+                    {
+                        writer.AppendLine($"var {modelName} = new {className}();");
+                        toModelContent.ForEach(writer.AppendLine);
+                        writer.AppendLine($"return {modelName};");
                     }
                 }
-                using (writer.BeginScope($"namespace {@namespace}"))
+            }
+            return writer.ToString();
+
+        }
+
+        private static Mappings? GetMapperContent(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
+        {
+            return attribute.Mapping switch
+            {
+                MappingType.Basic => GenerateBasicMappings(modelName, attribute),
+                MappingType.Lookup => GenerateLookupMappings(modelName, attribute),
+                MappingType.Money => GenerateMoneyMappings(modelName, attribute),
+                MappingType.Formatted => GenerateFormattedMappings(modelName, attribute),
+                MappingType.MultipleOptions => GenerateMultipleOptionsMappings(modelName, attribute, ctx),
+                MappingType.Options => GenerateOptionsMappings(modelName, attribute),
+                _ => throw new Exception($"{attribute.Mapping} is not defined"),
+            };
+        }
+
+        private static Mappings GenerateOptionsMappings(string modelName, FieldGenerationDetails attribute)
+        {
+            string toEntity;
+            string toModel;
+            var nullable = attribute.PropertySymbol.NullableAnnotation == NullableAnnotation.Annotated;
+            if (attribute.PropertySymbol.Type is not INamedTypeSymbol typeSymbol)
+                throw new Exception("INamedTypeSymbol is expected");
+            var targetType = typeSymbol;
+            if (nullable)
+                targetType = typeSymbol.TypeArguments.First() as INamedTypeSymbol;
+
+            var castNeeded = targetType!.Name != typeof(int).Name;
+            var modelAsInt = castNeeded ? $"(int){attribute.PropertySymbol.Name}" : attribute.PropertySymbol.Name;
+            if (nullable)
+            {
+                toEntity = $"entity[\"{attribute.SchemaName}\"] = {attribute.PropertySymbol.Name}.HasValue ? new OptionSetValue({modelAsInt}.Value) : null;";
+                if (castNeeded)
+                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = ({typeSymbol.ToDisplayString()})(entity.GetAttributeValue<OptionSetValue>(\"{attribute.SchemaName}\")?.Value);";
+                else
+                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<OptionSetValue>(\"{attribute.SchemaName}\")?.Value;";
+            }
+            else
+            {
+                toEntity = $"entity[\"{attribute.SchemaName}\"] = new OptionSetValue({modelAsInt});";
+                if (castNeeded)
+                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = ({typeSymbol.ToDisplayString()})(entity.GetAttributeValue<OptionSetValue>(\"{attribute.SchemaName}\")?.Value ?? 0);";
+                else
+                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<OptionSetValue>(\"{attribute.SchemaName}\")?.Value ?? 0;";
+            }
+            return new Mappings(toModel, toEntity);
+        }
+
+        private static Mappings? GenerateMultipleOptionsMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
+        {
+            string toEntity;
+            string toModel;
+            var nullable = attribute.PropertySymbol.NullableAnnotation == NullableAnnotation.Annotated;
+            if (attribute.PropertySymbol.Type is not IArrayTypeSymbol arrayTypeSymbol)
+                throw new Exception("IArrayTypeSymbol is expected");
+
+            if (arrayTypeSymbol.ElementType is not INamedTypeSymbol elementTypeSymbol)
+                throw new Exception("INamedTypeSymbol is expected");
+
+            if (elementTypeSymbol.NullableAnnotation == NullableAnnotation.Annotated)
+            {
+                ;
+                var location = attribute.PropertySymbol.DeclaringSyntaxReferences.First().Span;
+                var a = attribute.PropertySymbol.DeclaringSyntaxReferences.First().SyntaxTree;
+                ctx.ReportDiagnostic(Diagnostic.Create(DiagnosticsDescriptors.NullableElementOnMultipleOptions,
+                                                       attribute.PropertySymbol.Locations.First(),
+                                                       attribute.PropertySymbol.Name));
+                return null;
+            }
+
+            var elementCastNeeded = elementTypeSymbol!.Name != typeof(int).Name;
+            var elementCastString = elementCastNeeded ? "(int)" : string.Empty;
+            if (nullable)
+            {
+                toEntity = $"entity[\"{attribute.SchemaName}\"] = {attribute.PropertySymbol.Name} is null ? null : new OptionSetValueCollection({attribute.PropertySymbol.Name}.Select(e => new OptionSetValue({elementCastString}e)).ToList());";
+                if (elementCastNeeded)
+                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<OptionSetValueCollection>(\"{attribute.SchemaName}\")?.Select(e => e.Value).Cast<{elementTypeSymbol.ToDisplayString()}>().ToArray();";
+                else
+                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<OptionSetValueCollection>(\"{attribute.SchemaName}\")?.Select(e => e.Value).ToArray();";
+            }
+            else
+            {
+                toEntity = $"entity[\"{attribute.SchemaName}\"] = new OptionSetValueCollection({attribute.PropertySymbol.Name}.Select(e => new OptionSetValue({elementCastString}e)).ToList());";
+                if (elementCastNeeded)
+                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<OptionSetValueCollection>(\"{attribute.SchemaName}\")?.Select(e => e.Value).Cast<{elementTypeSymbol.ToDisplayString()}>().ToArray() ?? Array.Empty<{elementTypeSymbol.ToDisplayString()}>();";
+                else
+                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<OptionSetValueCollection>(\"{attribute.SchemaName}\")?.Select(e => e.Value).ToArray() ?? Array.Empty<{elementTypeSymbol.ToDisplayString()}>();";
+            }
+            return new Mappings(toModel, toEntity);
+        }
+
+        private static Mappings GenerateFormattedMappings(string modelName, FieldGenerationDetails attribute)
+        {
+            var codeWriter = new CodeWriter();
+            using (codeWriter.BeginScope($"if (entity.FormattedValues.TryGetValue(\"{attribute.SchemaName}\", out var formatted{attribute.PropertySymbol.Name}))"))
+            {
+                codeWriter.AppendLine($"{modelName}.{attribute.PropertySymbol.Name} = formatted{attribute.PropertySymbol.Name};");
+            }
+            return new Mappings(codeWriter.ToString(), string.Empty);
+        }
+
+        private static Mappings GenerateMoneyMappings(string modelName, FieldGenerationDetails attribute)
+        {
+            string toModel;
+            string toEntity;
+            if (attribute.PropertySymbol.NullableAnnotation == NullableAnnotation.Annotated)
+            {
+                toEntity = $"entity[\"{attribute.SchemaName}\"] = {attribute.PropertySymbol.Name}.HasValue ? new Money({attribute.PropertySymbol.Name}.Value) : null;";
+                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<Money>(\"{attribute.SchemaName}\")?.Value;";
+            }
+            else
+            {
+                toEntity = $"entity[\"{attribute.SchemaName}\"] = new Money({attribute.PropertySymbol.Name});";
+                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<Money>(\"{attribute.SchemaName}\")?.Value ?? 0m;";
+            }
+            return new Mappings(toModel, toEntity);
+        }
+
+        private static Mappings GenerateLookupMappings(string modelName, FieldGenerationDetails attribute)
+        {
+            string toModel;
+            string toEntity;
+            if (attribute.PropertySymbol.NullableAnnotation == NullableAnnotation.Annotated)
+            {
+                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<EntityReference>(\"{attribute.SchemaName}\")?.Id;";
+                toEntity = $"entity[\"{attribute.SchemaName}\"] = {attribute.PropertySymbol.Name}.HasValue ? new EntityReference(\"{attribute.Target}\", {attribute.PropertySymbol.Name}.Value) : null;";
+            }
+            else
+            {
+                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<EntityReference>(\"{attribute.SchemaName}\")?.Id ?? Guid.Empty;";
+                toEntity = $"entity[\"{attribute.SchemaName}\"] = new EntityReference(\"{attribute.Target}\", {attribute.PropertySymbol.Name});";
+            }
+            return new Mappings(toModel, toEntity);
+        }
+        private static Mappings GenerateBasicMappings(string modelName, FieldGenerationDetails attribute)
+        {
+            var toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<{attribute.PropertySymbol.Type}>(\"{attribute.SchemaName}\");";
+            var toEntity = $"entity[\"{attribute.SchemaName}\"] = {attribute.PropertySymbol.Name};";
+            return new Mappings(toModel, toEntity);
+        }
+
+        private static IEnumerable<FieldGenerationDetails> ExtractAttributes(IEnumerable<IPropertySymbol> properties, INamedTypeSymbol crmFieldAttributeSymbol, SourceProductionContext ctx)
+        {
+            var errors = new List<string>();
+            foreach (var propertySymbol in properties)
+            {
+                if (propertySymbol.HasAttribute(crmFieldAttributeSymbol))
                 {
-                    using (writer.BeginScope($"public partial class {className}"))
+                    var attributeData = propertySymbol.GetAttribute(crmFieldAttributeSymbol).First();
+                    var typeSymbol = SourceGenerationHelper.GetTypeSymbol(propertySymbol.Type, out var nullable);
+                    var logicalName = (string)attributeData.ConstructorArguments[0].Value!;
+                    var mappingType = MappingType.Basic;
+                    string? target = null;
+                    foreach (var namedArgument in attributeData.NamedArguments)
                     {
-                        writer.AppendLine($"public static ColumnSet ColumnSet = new ColumnSet({string.Join(", ", columns)});");
-                        writer.AppendLine();
-                        writer.AppendLine($"public Guid {className}Id {{ get; set; }}");
-                        writer.AppendLine();
-                        using (writer.BeginScope($"public Entity ToEntity()"))
+                        if (namedArgument.Key == "Mapping")
+                            mappingType = (MappingType)namedArgument.Value.Value!;
+                        if (namedArgument.Key == "Target")
                         {
-                            writer.AppendLine($"var entity = new Entity(\"{generationDetail.EntityName}\", {className}Id);");
-                            toEntityContent.ForEach(writer.AppendLine);
-                            writer.AppendLine("return entity;");
+                            target = (string)namedArgument.Value.Value!;
+                            mappingType = MappingType.Lookup;
                         }
-                        writer.AppendLine();
-                        using (writer.BeginScope($"public static {className} FromEntity(Entity entity)"))
-                        {
-                            writer.AppendLine($"var {modelName} = new {className}();");
-                            toModelContent.ForEach(writer.AppendLine);
-                            writer.AppendLine($"return {modelName};");
-                        }
+
                     }
+                    var alloewdTypes = GetAllowedTypes(mappingType);
+                    if (!alloewdTypes.Any(t => t.Name == typeSymbol.Name))
+                    {
+                        var isEnum = typeSymbol is INamedTypeSymbol { EnumUnderlyingType: not null };
+                        if (mappingType != MappingType.Options && mappingType != MappingType.MultipleOptions)
+                            errors.Add($"{typeSymbol.ToDisplayString()} type is not allowed for mapping type {mappingType}");
+                        if (mappingType == MappingType.Options && !isEnum)
+                            errors.Add($"{typeSymbol.ToDisplayString()} type is not allowed for mapping type {mappingType}");
+                        //if (mappingType == MappingType.MultipleOptions && typeSymbol is IArrayTypeSymbol arrayTypeSymbol)
+                        //{
+                        //    var elementType = SourceGenerationHelper.GetTypeSymbol(arrayTypeSymbol.ElementType, out var nullableElement);
+                        //    if (elementType.Name != typeof(int).Name || nullableElement)
+                        //        errors.Add($"{mappingType} only supports int[] or int[]? as a destination type");
+                        //}
+                    }
+
+                    var propertyName = propertySymbol.Name;
+                    if (string.IsNullOrEmpty(logicalName))
+                        errors.Add($"The property {propertyName} has no logicalName");
+
+                    if (errors.Any())
+                    {
+                        throw new Exception($"errors found, {string.Join(", ", errors)}");
+                        continue;
+                    }
+
+                    yield return new FieldGenerationDetails(logicalName, propertySymbol, mappingType, target);
                 }
-                var gen = writer.ToString();
-                context.AddSource($"{className}.g.cs", writer.ToString());
             }
         }
 
-        private IEnumerable<FieldGenerationDetails> ExtractAttributes(Compilation compilation, ClassDeclarationSyntax @class)
+        private static Type[] GetAllowedTypes(MappingType mappingType)
         {
-            var crmFields = ExtractCRMFieldAttributes(compilation, @class);
-            var lookupFields = ExtractCRMReferenceAttributes(compilation, @class);
-            var moneyFields = ExtractCRMMoneyAttributes(compilation, @class);
-            var formattedAttributes = ExtractCRMFormattedAttributes(compilation, @class);
-            var optionsAttributes = ExtractCRMOptionsAttributes(compilation, @class);
-
-            return crmFields.Union(lookupFields)
-                            .Union(moneyFields)
-                            .Union(formattedAttributes)
-                            .Union(optionsAttributes)
-                            .OrderBy(fg => fg.PropertyName);
-        }
-
-        private IEnumerable<FieldGenerationDetails> ExtractCRMOptionsAttributes(Compilation compilation, ClassDeclarationSyntax @class)
-        {
-            var allowedTypes = new[] { "Int32" };
-            var attributes = @class.DescendantNodes().OfType<AttributeSyntax>()
-                .Where(syntax => syntax.Name.ToString() == "CrmOptions")
-                .ToList();
-
-            var errors = new List<string>();
-            foreach (var attributeSyntax in attributes)
+            return mappingType switch
             {
-                var propertyDeclarationSyntax = attributeSyntax.GetParent<PropertyDeclarationSyntax>()!;
-                var propertySymbol = compilation
-                    .GetSemanticModel(propertyDeclarationSyntax.SyntaxTree)
-                    .GetDeclaredSymbol(propertyDeclarationSyntax)!;
-
-                var typeSymbol = SourceGenerationHelper.GetTypeSymbol(propertySymbol!, out var nullable);
-                var attributeData = propertySymbol.GetAttributes().Where(a => a.AttributeClass!.MetadataName == "CrmOptionsAttribute").First();
-                var logicalName = attributeData.ConstructorArguments.First().Value as string;
-
-                if (!allowedTypes.Contains(typeSymbol.Name, StringComparer.OrdinalIgnoreCase)
-                    && typeSymbol is INamedTypeSymbol { EnumUnderlyingType: null })
-                    errors.Add($"{typeSymbol.Name} type is not allowed");
-
-                var propertyName = propertySymbol.Name;
-                if (string.IsNullOrEmpty(logicalName))
-                {
-                    errors.Add($"The property {propertyName} has no logicalName");
-                    continue;
-                }
-
-                yield return new FieldGenerationDetails(logicalName!, propertyName, propertyDeclarationSyntax.Type.ToString(), nullable)
-                {
-                    FieldType = FieldType.Options
-                };
-            }
-            if (errors.Any())
-                throw new Exception("errors found");
+                MappingType.Basic => new[] { typeof(bool), typeof(Guid), typeof(int), typeof(DateTime), typeof(double), typeof(decimal), typeof(string) },
+                MappingType.Lookup => new[] { typeof(Guid) },
+                MappingType.Money => new[] { typeof(decimal) },
+                MappingType.Formatted => new[] { typeof(string) },
+                MappingType.Options => new[] { typeof(int) },
+                MappingType.MultipleOptions => Array.Empty<Type>(),
+                _ => throw new Exception($"Unknown mapping type: {mappingType}"),
+            };
         }
-
-        private IEnumerable<FieldGenerationDetails> ExtractCRMFormattedAttributes(Compilation compilation, ClassDeclarationSyntax @class)
-        {
-            var allowedTypes = new[] { "String" };
-            var attributes = @class.DescendantNodes().OfType<AttributeSyntax>()
-                .Where(syntax => syntax.Name.ToString() == "CrmFormatted")
-                .ToList();
-
-            var errors = new List<string>();
-            foreach (var attributeSyntax in attributes)
-            {
-                var propertyDeclarationSyntax = attributeSyntax.GetParent<PropertyDeclarationSyntax>()!;
-                var propertySymbol = compilation
-                    .GetSemanticModel(propertyDeclarationSyntax.SyntaxTree)
-                    .GetDeclaredSymbol(propertyDeclarationSyntax)!;
-
-                var typeSymbol = SourceGenerationHelper.GetTypeSymbol(propertySymbol!, out var nullable);
-                var attributeData = propertySymbol.GetAttributes().Where(a => a.AttributeClass!.MetadataName == "CrmFormattedAttribute").First();
-                var logicalName = attributeData.ConstructorArguments.First().Value as string;
-
-                if (!allowedTypes.Contains(typeSymbol.Name, StringComparer.OrdinalIgnoreCase))
-                    errors.Add($"{typeSymbol.Name} type is not allowed");
-
-                var propertyName = propertySymbol.Name;
-                if (string.IsNullOrEmpty(logicalName))
-                {
-                    errors.Add($"The property {propertyName} has no logicalName");
-                    continue;
-                }
-
-                yield return new FieldGenerationDetails(logicalName!, propertyName, propertyDeclarationSyntax.Type.ToString(), nullable)
-                {
-                    FieldType = FieldType.Formatted
-                };
-            }
-            if (errors.Any())
-                throw new Exception("errors found");
-        }
-
-        private IEnumerable<FieldGenerationDetails> ExtractCRMMoneyAttributes(Compilation compilation, ClassDeclarationSyntax @class)
-        {
-            var allowedTypes = new[] { "Decimal" };
-            var attributes = @class.DescendantNodes().OfType<AttributeSyntax>()
-                .Where(syntax => syntax.Name.ToString() == "CrmMoney")
-                .ToList();
-
-            var errors = new List<string>();
-            foreach (var attributeSyntax in attributes)
-            {
-                var propertyDeclarationSyntax = attributeSyntax.GetParent<PropertyDeclarationSyntax>()!;
-                var propertySymbol = compilation
-                    .GetSemanticModel(propertyDeclarationSyntax.SyntaxTree)
-                    .GetDeclaredSymbol(propertyDeclarationSyntax)!;
-
-                var typeSymbol = SourceGenerationHelper.GetTypeSymbol(propertySymbol!, out var nullable);
-                var attributeData = propertySymbol.GetAttributes().Where(a => a.AttributeClass!.MetadataName == "CrmMoneyAttribute").First();
-                var logicalName = attributeData.ConstructorArguments.First().Value as string;
-
-                if (!allowedTypes.Contains(typeSymbol.Name, StringComparer.OrdinalIgnoreCase))
-                    errors.Add($"{typeSymbol.Name} type is not allowed");
-
-                var propertyName = propertySymbol.Name;
-                if (string.IsNullOrEmpty(logicalName))
-                {
-                    errors.Add($"The property {propertyName} has no logicalName");
-                    continue;
-                }
-
-                yield return new FieldGenerationDetails(logicalName!, propertyName, propertyDeclarationSyntax.Type.ToString(), nullable)
-                {
-                    FieldType = FieldType.Money
-                };
-            }
-            if (errors.Any())
-                throw new Exception("errors found");
-        }
-
-        private IEnumerable<FieldGenerationDetails> ExtractCRMReferenceAttributes(Compilation compilation, ClassDeclarationSyntax @class)
-        {
-            var allowedTypes = new[] { "Guid" };
-            var attributes = @class.DescendantNodes().OfType<AttributeSyntax>()
-                .Where(syntax => syntax.Name.GetText().ToString() == "CrmReference")
-                .ToList();
-
-            var errors = new List<string>();
-            foreach (var attributeSyntax in attributes)
-            {
-                var propertyDeclarationSyntax = attributeSyntax.GetParent<PropertyDeclarationSyntax>()!;
-                var propertySymbol = compilation
-                    .GetSemanticModel(propertyDeclarationSyntax.SyntaxTree)
-                    .GetDeclaredSymbol(propertyDeclarationSyntax)!;
-
-                var typeSymbol = SourceGenerationHelper.GetTypeSymbol(propertySymbol!, out var nullable);
-                var attributeData = propertySymbol.GetAttributes().Where(a => a.AttributeClass!.MetadataName == "CrmReferenceAttribute").First();
-                var logicalName = attributeData.ConstructorArguments.ElementAt(0).Value as string;
-                var target = attributeData.ConstructorArguments.ElementAt(1).Value as string;
-
-                if (!allowedTypes.Contains(typeSymbol.Name, StringComparer.OrdinalIgnoreCase))
-                    errors.Add($"{typeSymbol.Name} type is not allowed");
-
-                var propertyName = propertySymbol.Name;
-                if (string.IsNullOrEmpty(logicalName))
-                {
-                    errors.Add($"The property {propertyName} has no logicalName");
-                    continue;
-                }
-
-                if (string.IsNullOrEmpty(target))
-                {
-                    errors.Add($"The property {propertyName} has no target");
-                    continue;
-                }
-
-                yield return new FieldGenerationDetails(logicalName!, propertyName, propertyDeclarationSyntax.Type.ToString(), nullable)
-                {
-                    Target = target!,
-                    FieldType = FieldType.Lookup
-                };
-            }
-            if (errors.Any())
-                throw new Exception("errors found");
-        }
-        private IEnumerable<FieldGenerationDetails> ExtractCRMFieldAttributes(Compilation compilation, ClassDeclarationSyntax @class)
-        {
-            var allowedTypes = new[] { "Boolean", "Guid", "Int32", "DateTime", "Double", "Decimal", "String" };
-            var attributes = @class.DescendantNodes().OfType<AttributeSyntax>()
-                .Where(syntax => syntax.Name.ToString() == "CrmField")
-                .ToList();
-
-            var errors = new List<string>();
-            foreach (var attributeSyntax in attributes)
-            {
-                var propertyDeclarationSyntax = attributeSyntax.GetParent<PropertyDeclarationSyntax>()!;
-                var propertySymbol = compilation
-                    .GetSemanticModel(propertyDeclarationSyntax.SyntaxTree)
-                    .GetDeclaredSymbol(propertyDeclarationSyntax)!;
-
-                var typeSymbol = SourceGenerationHelper.GetTypeSymbol(propertySymbol!, out var nullable);
-                var attributeData = propertySymbol.GetAttributes().Where(a => a.AttributeClass!.MetadataName == "CrmFieldAttribute").First();
-                var logicalName = attributeData.ConstructorArguments.First().Value as string;
-
-                if (!allowedTypes.Contains(typeSymbol.Name, StringComparer.OrdinalIgnoreCase))
-                    errors.Add($"{typeSymbol.Name} type is not allowed");
-
-                var propertyName = propertySymbol.Name;
-                if (string.IsNullOrEmpty(logicalName))
-                {
-                    errors.Add($"The property {propertyName} has no logicalName");
-                    continue;
-                }
-
-                yield return new FieldGenerationDetails(logicalName!, propertyName, propertyDeclarationSyntax.Type.ToString(), nullable)
-                {
-                    FieldType = FieldType.Regular
-                };
-            }
-            if (errors.Any())
-                throw new Exception("errors found");
-        }
-
-        private static ClassGenerationDetails? GetGenerationAttribute(GeneratorSyntaxContext ctx)
-        {
-            var attributeSyntax = (AttributeSyntax)ctx.Node;
-            if (attributeSyntax.Name is IdentifierNameSyntax nameSyntax)
-            {
-                if (nameSyntax is { Identifier.Text: "CrmEntity" })
-                {
-                    var firstArgument = (attributeSyntax.ArgumentList?.Arguments.FirstOrDefault())
-                        ?? throw new Exception("firstArgument is null");
-
-                    if (firstArgument.Expression is not LiteralExpressionSyntax literalExpression)
-                        throw new Exception("literalExpression not found");
-
-                    if (literalExpression.Token.Value is not string entityName)
-                        throw new Exception("entityName not found");
-                    var classSyntax = attributeSyntax.GetParent<ClassDeclarationSyntax>();
-                    if (classSyntax is null)
-                        throw new Exception("class not found");
-
-                    return new ClassGenerationDetails(entityName, classSyntax);
-                }
-            }
-            return null;
-        }
-
-        private static bool IsAttributeNode(SyntaxNode node) => node is AttributeSyntax;
     }
 }

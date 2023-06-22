@@ -2,7 +2,7 @@
   "profiles": {
     "Profile 1": {
       "commandName": "DebugRoslynComponent",
-      "targetProject": "..\\ConsoleClient\\ConsoleClient.csproj"
+      "targetProject": "..\\DebuggerClient\\DebuggerClient.csproj"
     }
   }
 }
