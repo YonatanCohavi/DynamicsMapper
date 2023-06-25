@@ -124,18 +124,24 @@ namespace DynamicsMapper
         {
             return attribute.Mapping switch
             {
-                MappingType.Basic => GenerateBasicMappings(modelName, attribute),
-                MappingType.Lookup => GenerateLookupMappings(modelName, attribute),
-                MappingType.Money => GenerateMoneyMappings(modelName, attribute),
-                MappingType.Formatted => GenerateFormattedMappings(modelName, attribute),
+                MappingType.Basic => GenerateBasicMappings(modelName, attribute, ctx),
+                MappingType.Lookup => GenerateLookupMappings(modelName, attribute, ctx),
+                MappingType.Money => GenerateMoneyMappings(modelName, attribute, ctx),
+                MappingType.Formatted => GenerateFormattedMappings(modelName, attribute, ctx),
                 MappingType.MultipleOptions => GenerateMultipleOptionsMappings(modelName, attribute, ctx),
-                MappingType.Options => GenerateOptionsMappings(modelName, attribute),
+                MappingType.Options => GenerateOptionsMappings(modelName, attribute, ctx),
                 _ => throw new Exception($"{attribute.Mapping} is not defined"),
             };
         }
 
-        private static Mappings GenerateOptionsMappings(string modelName, FieldGenerationDetails attribute)
+        private static Mappings? GenerateOptionsMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
         {
+            var unelyingTypeSymbol = attribute.PropertySymbol.Type.GetUnelyingType();
+            if (unelyingTypeSymbol.Name != typeof(int).Name && unelyingTypeSymbol.TypeKind != TypeKind.Enum)
+            {
+                attribute.PropertySymbol.SetInvalidTypeDiagnostic(ctx, unelyingTypeSymbol.Name, MappingType.Options, new[] { typeof(int).Name, typeof(Enum).Name });
+                return null;
+            }
             string toEntity;
             string toModel;
             var nullable = attribute.PropertySymbol.NullableAnnotation == NullableAnnotation.Annotated;
@@ -179,15 +185,15 @@ namespace DynamicsMapper
 
             if (elementTypeSymbol.NullableAnnotation == NullableAnnotation.Annotated)
             {
-                ;
-                var location = attribute.PropertySymbol.DeclaringSyntaxReferences.First().Span;
-                var a = attribute.PropertySymbol.DeclaringSyntaxReferences.First().SyntaxTree;
-                ctx.ReportDiagnostic(Diagnostic.Create(DiagnosticsDescriptors.NullableElementOnMultipleOptions,
-                                                       attribute.PropertySymbol.Locations.First(),
-                                                       attribute.PropertySymbol.Name));
+                attribute.PropertySymbol.SetDiagnostic(ctx, DiagnosticsDescriptors.NullableElementOnMultipleOptions);
                 return null;
             }
-
+            var unelyingTypeSymbol = elementTypeSymbol.GetUnelyingType();
+            if (unelyingTypeSymbol.Name != typeof(int).Name && unelyingTypeSymbol.TypeKind != TypeKind.Enum)
+            {
+                attribute.PropertySymbol.SetInvalidTypeDiagnostic(ctx, unelyingTypeSymbol.Name, MappingType.MultipleOptions, new[] { typeof(int).Name, typeof(Enum).Name });
+                return null;
+            }
             var elementCastNeeded = elementTypeSymbol!.Name != typeof(int).Name;
             var elementCastString = elementCastNeeded ? "(int)" : string.Empty;
             if (nullable)
@@ -209,8 +215,16 @@ namespace DynamicsMapper
             return new Mappings(toModel, toEntity);
         }
 
-        private static Mappings GenerateFormattedMappings(string modelName, FieldGenerationDetails attribute)
+        private static Mappings? GenerateFormattedMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
         {
+            var allowedTypes = GetAllowedTypes(MappingType.Formatted);
+            var typeSymbol = attribute.PropertySymbol.Type.GetUnelyingType().Name;
+            if (!allowedTypes.Any(t => t.Name == typeSymbol))
+            {
+                attribute.PropertySymbol.SetInvalidTypeDiagnostic(ctx, typeSymbol, MappingType.Formatted, allowedTypes);
+                return null;
+            }
+
             var codeWriter = new CodeWriter();
             using (codeWriter.BeginScope($"if (entity.FormattedValues.TryGetValue(\"{attribute.SchemaName}\", out var formatted{attribute.PropertySymbol.Name}))"))
             {
@@ -219,8 +233,15 @@ namespace DynamicsMapper
             return new Mappings(codeWriter.ToString(), string.Empty);
         }
 
-        private static Mappings GenerateMoneyMappings(string modelName, FieldGenerationDetails attribute)
+        private static Mappings? GenerateMoneyMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
         {
+            var allowedTypes = GetAllowedTypes(MappingType.Money);
+            var typeSymbol = attribute.PropertySymbol.Type.GetUnelyingType().Name;
+            if (!allowedTypes.Any(t => t.Name == typeSymbol))
+            {
+                attribute.PropertySymbol.SetInvalidTypeDiagnostic(ctx, typeSymbol, MappingType.Money, allowedTypes);
+                return null;
+            }
             string toModel;
             string toEntity;
             if (attribute.PropertySymbol.NullableAnnotation == NullableAnnotation.Annotated)
@@ -236,8 +257,15 @@ namespace DynamicsMapper
             return new Mappings(toModel, toEntity);
         }
 
-        private static Mappings GenerateLookupMappings(string modelName, FieldGenerationDetails attribute)
+        private static Mappings? GenerateLookupMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
         {
+            var allowedTypes = GetAllowedTypes(MappingType.Lookup);
+            var typeSymbol = attribute.PropertySymbol.Type.GetUnelyingType().Name;
+            if (!allowedTypes.Any(t => t.Name == typeSymbol))
+            {
+                attribute.PropertySymbol.SetInvalidTypeDiagnostic(ctx, typeSymbol, MappingType.Lookup, allowedTypes);
+                return null;
+            }
             string toModel;
             string toEntity;
             if (attribute.PropertySymbol.NullableAnnotation == NullableAnnotation.Annotated)
@@ -252,8 +280,15 @@ namespace DynamicsMapper
             }
             return new Mappings(toModel, toEntity);
         }
-        private static Mappings GenerateBasicMappings(string modelName, FieldGenerationDetails attribute)
+        private static Mappings? GenerateBasicMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
         {
+            var allowedTypes = GetAllowedTypes(MappingType.Basic);
+            var typeSymbol = attribute.PropertySymbol.Type.GetUnelyingType().Name;
+            if (!allowedTypes.Any(t => t.Name == typeSymbol))
+            {
+                attribute.PropertySymbol.SetInvalidTypeDiagnostic(ctx, typeSymbol, MappingType.Basic, allowedTypes);
+                return null;
+            }
             var toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<{attribute.PropertySymbol.Type}>(\"{attribute.SchemaName}\");";
             var toEntity = $"entity[\"{attribute.SchemaName}\"] = {attribute.PropertySymbol.Name};";
             return new Mappings(toModel, toEntity);
@@ -280,22 +315,6 @@ namespace DynamicsMapper
                             target = (string)namedArgument.Value.Value!;
                             mappingType = MappingType.Lookup;
                         }
-
-                    }
-                    var alloewdTypes = GetAllowedTypes(mappingType);
-                    if (!alloewdTypes.Any(t => t.Name == typeSymbol.Name))
-                    {
-                        var isEnum = typeSymbol is INamedTypeSymbol { EnumUnderlyingType: not null };
-                        if (mappingType != MappingType.Options && mappingType != MappingType.MultipleOptions)
-                            errors.Add($"{typeSymbol.ToDisplayString()} type is not allowed for mapping type {mappingType}");
-                        if (mappingType == MappingType.Options && !isEnum)
-                            errors.Add($"{typeSymbol.ToDisplayString()} type is not allowed for mapping type {mappingType}");
-                        //if (mappingType == MappingType.MultipleOptions && typeSymbol is IArrayTypeSymbol arrayTypeSymbol)
-                        //{
-                        //    var elementType = SourceGenerationHelper.GetTypeSymbol(arrayTypeSymbol.ElementType, out var nullableElement);
-                        //    if (elementType.Name != typeof(int).Name || nullableElement)
-                        //        errors.Add($"{mappingType} only supports int[] or int[]? as a destination type");
-                        //}
                     }
 
                     var propertyName = propertySymbol.Name;
