@@ -21,6 +21,10 @@
     <None Remove="bin\**" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Remove="AnalyzerReleases.Shipped.md" />
+  </ItemGroup>
+
   
   <ItemGroup>
     <!-- Package the generator in the analyzer directory of the nuget package -->

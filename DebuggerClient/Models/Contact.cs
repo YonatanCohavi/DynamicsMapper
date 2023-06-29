@@ -6,6 +6,8 @@ namespace DebuggerClient.Models
     [CrmEntity("contact")]
     public partial class Contact
     {
+        [CrmField("contactid", Mapping = MappingType.PrimaryId)]
+        public Guid? ContactId { get; set; }
         [CrmField("rtm_o_test", Mapping = MappingType.MultipleOptions)]
         public int[]? Tests { get; set; }
         [CrmField("rtm_o_test2", Mapping = MappingType.MultipleOptions)]
@@ -15,7 +17,7 @@ namespace DebuggerClient.Models
         [CrmField("rtm_l_account", Mapping = MappingType.Options)]
         public int? IntContantType { get; set; }
         [CrmField("rtm_s_firstname")]
-        public string Firstname { get; set; }
+        public string? Firstname { get; set; }
         [CrmField("rtm_s_lastname")]
         public string? Lastname { get; set; }
         [CrmField("rtm_s_email_address")]

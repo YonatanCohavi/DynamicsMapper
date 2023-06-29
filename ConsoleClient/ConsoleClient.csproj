@@ -12,7 +12,6 @@
   <ItemGroup>
     <PackageReference Include="DynamicsMapper" Version="1.0.0" />
     <PackageReference Include="Microsoft.PowerPlatform.Dataverse.Client" Version="1.1.9" />
-    <PackageReference Include="Riok.Mapperly" Version="2.8.0" />
   </ItemGroup>
 
 </Project>

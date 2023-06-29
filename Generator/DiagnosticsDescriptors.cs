@@ -20,5 +20,20 @@ namespace DynamicsMapper
             DiagnosticSeverity.Error,
             isEnabledByDefault: true);
 
+        public static readonly DiagnosticDescriptor NoLogicalname = new(
+           id: "DYM003",
+           title: "No logicalname",
+           messageFormat: "{0} has no logicalname",
+           category: "DynamicsMapper",
+           DiagnosticSeverity.Error,
+           isEnabledByDefault: true);
+
+        public static readonly DiagnosticDescriptor NoTarget = new(
+           id: "DYM004",
+           title: "No target",
+           messageFormat: "{0} has no target, target is mandatory for lookups",
+           category: "DynamicsMapper",
+           DiagnosticSeverity.Error,
+           isEnabledByDefault: true);
     }
 }

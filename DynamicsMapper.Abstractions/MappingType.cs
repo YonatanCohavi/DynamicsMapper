@@ -8,5 +8,6 @@
         Formatted = 4,
         Options = 5,
         MultipleOptions = 6,
+        PrimaryId = 7,
     }
 }

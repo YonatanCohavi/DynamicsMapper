@@ -6,11 +6,9 @@ using DynamicsMapper.Models;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Data.SqlTypes;
 using System.Linq;
 
 namespace DynamicsMapper
@@ -58,7 +56,7 @@ namespace DynamicsMapper
                 var entityName = (string)crmAttributeData.ConstructorArguments[0].Value!;
                 var properties = mapperSymbol.GetMembers().OfType<IPropertySymbol>();
 
-                var generationDetails = ExtractAttributes(properties, crmFieldAttributeSymbol, ctx)
+                var generationDetails = ExtractAttributes(properties, crmFieldAttributeSymbol,ctx)
                     .ToArray();
                 var className = mapperSyntax.Identifier.ValueText;
                 var classContent = GeneratePartialMapperClass(mapperSyntax, entityName, generationDetails, ctx);
@@ -81,10 +79,8 @@ namespace DynamicsMapper
             writer.AppendLine();
             var modelName = $"{char.ToLower(className[0])}{className.Substring(1)}";
             var toEntityContent = new List<string>();
-            var toModelContent = new List<string>()
-            {
-                $"{modelName}.{className}Id = entity.Id;"
-            };
+            var toModelContent = new List<string>();
+
             foreach (var attribute in generationDetails)
             {
                 var mappings = GetMapperContent(modelName, attribute, ctx);
@@ -99,11 +95,9 @@ namespace DynamicsMapper
                 {
                     writer.AppendLine($"public static ColumnSet ColumnSet = new ColumnSet({string.Join(", ", columns)});");
                     writer.AppendLine();
-                    writer.AppendLine($"public Guid {className}Id {{ get; set; }}");
-                    writer.AppendLine();
                     using (writer.BeginScope($"public Entity ToEntity()"))
                     {
-                        writer.AppendLine($"var entity = new Entity(\"{entityName}\", {className}Id);");
+                        writer.AppendLine($"var entity = new Entity(\"{entityName}\");");
                         toEntityContent.ForEach(writer.AppendLine);
                         writer.AppendLine("return entity;");
                     }
@@ -117,7 +111,6 @@ namespace DynamicsMapper
                 }
             }
             return writer.ToString();
-
         }
 
         private static Mappings? GetMapperContent(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
@@ -130,8 +123,32 @@ namespace DynamicsMapper
                 MappingType.Formatted => GenerateFormattedMappings(modelName, attribute, ctx),
                 MappingType.MultipleOptions => GenerateMultipleOptionsMappings(modelName, attribute, ctx),
                 MappingType.Options => GenerateOptionsMappings(modelName, attribute, ctx),
+                MappingType.PrimaryId => GeneratePrimaryIdMappings(modelName, attribute, ctx),
                 _ => throw new Exception($"{attribute.Mapping} is not defined"),
             };
+        }
+
+        private static Mappings? GeneratePrimaryIdMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
+        {
+            var allowedTypes = GetAllowedTypes(MappingType.PrimaryId);
+            var typeSymbol = attribute.PropertySymbol.Type.GetUnelyingType().Name;
+            var nullable = attribute.PropertySymbol.NullableAnnotation == NullableAnnotation.Annotated;
+            if (!allowedTypes.Any(t => t.Name == typeSymbol))
+            {
+                attribute.PropertySymbol.SetInvalidTypeDiagnostic(ctx, typeSymbol, MappingType.Basic, allowedTypes);
+                return null;
+            }
+            string toEntity;
+            var toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.Id;";
+            if (nullable)
+            {
+                toEntity = $"entity.Id = {attribute.PropertySymbol.Name}.HasValue ? {attribute.PropertySymbol.Name}.Value : Guid.Empty;";
+            }
+            else
+            {
+                toEntity = $"entity.Id = {attribute.PropertySymbol.Name};";
+            }
+            return new Mappings(toModel, toEntity);
         }
 
         private static Mappings? GenerateOptionsMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
@@ -296,13 +313,11 @@ namespace DynamicsMapper
 
         private static IEnumerable<FieldGenerationDetails> ExtractAttributes(IEnumerable<IPropertySymbol> properties, INamedTypeSymbol crmFieldAttributeSymbol, SourceProductionContext ctx)
         {
-            var errors = new List<string>();
             foreach (var propertySymbol in properties)
             {
                 if (propertySymbol.HasAttribute(crmFieldAttributeSymbol))
                 {
                     var attributeData = propertySymbol.GetAttribute(crmFieldAttributeSymbol).First();
-                    var typeSymbol = SourceGenerationHelper.GetTypeSymbol(propertySymbol.Type, out var nullable);
                     var logicalName = (string)attributeData.ConstructorArguments[0].Value!;
                     var mappingType = MappingType.Basic;
                     string? target = null;
@@ -317,13 +332,9 @@ namespace DynamicsMapper
                         }
                     }
 
-                    var propertyName = propertySymbol.Name;
                     if (string.IsNullOrEmpty(logicalName))
-                        errors.Add($"The property {propertyName} has no logicalName");
-
-                    if (errors.Any())
                     {
-                        throw new Exception($"errors found, {string.Join(", ", errors)}");
+                        propertySymbol.SetDiagnostic(ctx, DiagnosticsDescriptors.NoLogicalname, propertySymbol.Name);
                         continue;
                     }
 
@@ -341,6 +352,7 @@ namespace DynamicsMapper
                 MappingType.Money => new[] { typeof(decimal) },
                 MappingType.Formatted => new[] { typeof(string) },
                 MappingType.Options => new[] { typeof(int) },
+                MappingType.PrimaryId => new[] { typeof(Guid) },
                 MappingType.MultipleOptions => Array.Empty<Type>(),
                 _ => throw new Exception($"Unknown mapping type: {mappingType}"),
             };

@@ -9,7 +9,7 @@ namespace DynamicsMapper.Helpers
 {
     internal static class SymbolExtensions
     {
-        internal static void SetDiagnostic(this ISymbol symbol, SourceProductionContext context, DiagnosticDescriptor diagnosticDescriptor, params object?[]? messageArgs) =>
+        internal static void SetDiagnostic(this ISymbol symbol, SourceProductionContext context, DiagnosticDescriptor diagnosticDescriptor, params object[]? messageArgs) =>
             context.ReportDiagnostic(Diagnostic.Create(diagnosticDescriptor,
                                                        symbol.Locations.First(),
                                                        symbol.Locations.Skip(1),
