@@ -22,8 +22,8 @@ namespace DynamicsMapper
 
         public static readonly DiagnosticDescriptor NoLogicalname = new(
            id: "DYM003",
-           title: "No logicalname",
-           messageFormat: "{0} has no logicalname",
+           title: "Logical name is not defined",
+           messageFormat: "Logical name is not defined for {0}",
            category: "DynamicsMapper",
            DiagnosticSeverity.Error,
            isEnabledByDefault: true);
