@@ -72,8 +72,14 @@ namespace DynamicsMapper
                 }
                 var className = mapperSyntax.Identifier.ValueText;
                 var classContent = GeneratePartialMapperClass(mapperSyntax, entityName, generationDetails, ctx);
-                ctx.AddSource($"{className}.g.cs", classContent);
 
+                // verify compilation
+                classContent = SyntaxFactory
+                      .ParseCompilationUnit(classContent)
+                      .NormalizeWhitespace()
+                      .GetText()
+                      .ToString();
+                ctx.AddSource($"{className}.g.cs", classContent);
             }
         }
 
