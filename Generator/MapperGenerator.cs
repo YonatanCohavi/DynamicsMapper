@@ -49,15 +49,27 @@ namespace DynamicsMapper
                 var mapperModel = compilation.GetSemanticModel(mapperSyntax.SyntaxTree);
                 if (mapperModel.GetDeclaredSymbol(mapperSyntax) is not INamedTypeSymbol mapperSymbol)
                     continue;
+
                 var crmAttributeData = mapperSymbol.GetAttribute(crmEntityAttributeSymbol).FirstOrDefault();
                 if (crmAttributeData is null)
                     continue;
+
+                if (!mapperSyntax.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)))
+                {
+                    mapperSymbol.SetDiagnostic(ctx, DiagnosticsDescriptors.NotPartial, mapperSymbol.Name);
+                    continue;
+                }
 
                 var entityName = (string)crmAttributeData.ConstructorArguments[0].Value!;
                 var properties = mapperSymbol.GetMembers().OfType<IPropertySymbol>();
 
                 var generationDetails = ExtractAttributes(properties, crmFieldAttributeSymbol,ctx)
                     .ToArray();
+                if (generationDetails.Where(gd => gd.Mapping == MappingType.PrimaryId).Count() > 1)
+                {
+                    mapperSymbol.SetDiagnostic(ctx, DiagnosticsDescriptors.MultiplePrimaryIds, mapperSymbol.Name);
+                    continue;
+                }
                 var className = mapperSyntax.Identifier.ValueText;
                 var classContent = GeneratePartialMapperClass(mapperSyntax, entityName, generationDetails, ctx);
                 ctx.AddSource($"{className}.g.cs", classContent);

@@ -2,7 +2,7 @@
 
 namespace ConsoleClient
 {
-  //  [CrmEntity("account")]
+    [CrmEntity("account")]
     public partial class Account
     {
         [CrmField("rtm_s_firstname")]

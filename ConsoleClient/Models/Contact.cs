@@ -6,17 +6,17 @@ namespace ConsoleClient.Models
     [CrmEntity("contact")]
     public partial class Contact
     {
-        [CrmField("contactid", Mapping = MappingType.PrimaryId)]
+        [CrmField("activityid", Mapping = MappingType.PrimaryId)]
         public Guid? ContactId { get; set; }
         [CrmField("rtm_o_test", Mapping = MappingType.MultipleOptions)]
         public int[]? Tests { get; set; }
         [CrmField("rtm_o_test2", Mapping = MappingType.MultipleOptions)]
-        public int[]? Tests2 { get; set; }
+        public ContactType[]? Tests2 { get; set; }
         [CrmField("rtm_l_account", Mapping = MappingType.Options)]
         public ContactType ContantType { get; set; }
         [CrmField("rtm_l_account", Mapping = MappingType.Options)]
         public int? IntContantType { get; set; }
-        [CrmField("asd")]
+        [CrmField("firstname")]
         public string? Firstname { get; set; }
         [CrmField("rtm_s_lastname")]
         public string? Lastname { get; set; }
