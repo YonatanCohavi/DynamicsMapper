@@ -39,7 +39,7 @@ namespace DynamicsMapper
         public static readonly DiagnosticDescriptor MultiplePrimaryIds = new(
            id: "DYM005",
            title: "Multiple Primary ids",
-           messageFormat: "{0} has multiple primary ids mappings",
+           messageFormat: "{0} has multiple 'PrimaryId' mappings",
            category: "DynamicsMapper",
            DiagnosticSeverity.Error,
            isEnabledByDefault: true);
@@ -47,7 +47,7 @@ namespace DynamicsMapper
         public static readonly DiagnosticDescriptor NotPartial = new(
          id: "DYM006",
          title: "Class Is Not Partial",
-         messageFormat: "{0} class must be partial",
+         messageFormat: "CrmEntity decorated class must be partial",
          category: "DynamicsMapper",
          DiagnosticSeverity.Error,
          isEnabledByDefault: true);
