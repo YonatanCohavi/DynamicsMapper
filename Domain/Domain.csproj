@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net6.0;net462</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>11</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net462' ">
+    <PackageReference Include="Microsoft.CrmSdk.CoreAssemblies" Version="9.0.2.49" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net6.0' ">
+    <PackageReference Include="Microsoft.PowerPlatform.Dataverse.Client" Version="1.1.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="YC.DynamicsMapper" Version="1.0.0-alpha" />
+  </ItemGroup>
+
+</Project>

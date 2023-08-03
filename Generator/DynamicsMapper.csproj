@@ -9,10 +9,22 @@
     <IsRoslynComponent>true</IsRoslynComponent>
     <GeneratedFolder>Generated</GeneratedFolder>
     <LangVersion>latest</LangVersion>
+
+    <PackageProjectUrl>https://github.com/YonatanCohavi/DynamicsMapper</PackageProjectUrl>
+    <PackageId>YC.DynamicsMapper</PackageId>
+    <PackageVersion>1.0.1-alpha</PackageVersion>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageDescription>
+      A .NET source generator for generating dynamics crm Enity mappings.
+      No runtime reflection.
+    </PackageDescription>
+    <PackageTags>Mapper SourceGenerator Dynamics CRM Dataverse 365</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <PropertyGroup>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <AssemblyVersion></AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -28,6 +40,7 @@
   
   <ItemGroup>
     <!-- Package the generator in the analyzer directory of the nuget package -->
+    <None Include="../README.md" Pack="true" PackagePath="\" />
     <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
     <None Include="$(OutputPath)\$(AssemblyName).Abstractions.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
     <None Include="$(OutputPath)\$(AssemblyName).Abstractions.dll" Pack="true" PackagePath="lib\netstandard2.0" Visible="true" />

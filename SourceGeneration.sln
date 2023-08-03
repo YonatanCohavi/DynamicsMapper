@@ -9,7 +9,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DynamicsMapper", "Generator
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DynamicsMapper.Abstractions", "DynamicsMapper.Abstractions\DynamicsMapper.Abstractions.csproj", "{CD754AFA-D559-4C87-A1AA-A7C1C2185CC0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DebuggerClient", "DebuggerClient\DebuggerClient.csproj", "{3AB65739-4C11-4730-8BD6-7BA7E02F9540}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DebuggerClient", "DebuggerClient\DebuggerClient.csproj", "{3AB65739-4C11-4730-8BD6-7BA7E02F9540}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Domain", "Domain\Domain.csproj", "{A704A406-A7E9-4ED0-87F9-B131B3D8E821}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,6 +35,10 @@ Global
 		{3AB65739-4C11-4730-8BD6-7BA7E02F9540}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3AB65739-4C11-4730-8BD6-7BA7E02F9540}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3AB65739-4C11-4730-8BD6-7BA7E02F9540}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A704A406-A7E9-4ED0-87F9-B131B3D8E821}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A704A406-A7E9-4ED0-87F9-B131B3D8E821}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A704A406-A7E9-4ED0-87F9-B131B3D8E821}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A704A406-A7E9-4ED0-87F9-B131B3D8E821}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

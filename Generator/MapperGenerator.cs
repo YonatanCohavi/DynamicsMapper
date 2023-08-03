@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.ComponentModel.Design.Serialization;
 using System.Linq;
 
 namespace DynamicsMapper
@@ -63,8 +64,18 @@ namespace DynamicsMapper
                 var entityName = (string)crmAttributeData.ConstructorArguments[0].Value!;
                 var properties = mapperSymbol.GetMembers().OfType<IPropertySymbol>();
 
-                var generationDetails = ExtractAttributes(properties, crmFieldAttributeSymbol,ctx)
+                var generationDetails = ExtractAttributes(properties, crmFieldAttributeSymbol, ctx)
                     .ToArray();
+
+                var duplicates = generationDetails.Where(dg => dg.Mapping != MappingType.Formatted)
+                    .GroupBy(dg => dg.SchemaName)
+                    .Where(g => g.Count() > 1)
+                    .SelectMany(g => g);
+                    
+
+                foreach (var duplicate in duplicates)
+                    mapperSymbol.SetDiagnostic(ctx, DiagnosticsDescriptors.DuplicateSchemas, mapperSymbol.Name);
+
                 if (generationDetails.Where(gd => gd.Mapping == MappingType.PrimaryId).Count() > 1)
                 {
                     mapperSymbol.SetDiagnostic(ctx, DiagnosticsDescriptors.MultiplePrimaryIds, mapperSymbol.Name);
@@ -102,10 +113,13 @@ namespace DynamicsMapper
             foreach (var attribute in generationDetails)
             {
                 var mappings = GetMapperContent(modelName, attribute, ctx);
+                var hasSetter = attribute.PropertySymbol.SetMethod is not null;
+
                 if (!mappings.HasValue)
                     continue;
                 toEntityContent.Add(mappings.Value.ToEntity);
-                toModelContent.Add(mappings.Value.ToModel);
+                if (hasSetter)
+                    toModelContent.Add(mappings.Value.ToModel);
             }
             using (writer.BeginScope($"namespace {@namespace}"))
             {
@@ -133,6 +147,7 @@ namespace DynamicsMapper
 
         private static Mappings? GetMapperContent(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
         {
+
             return attribute.Mapping switch
             {
                 MappingType.Basic => GenerateBasicMappings(modelName, attribute, ctx),

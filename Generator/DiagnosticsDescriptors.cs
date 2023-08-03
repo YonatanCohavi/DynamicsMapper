@@ -51,5 +51,14 @@ namespace DynamicsMapper
          category: "DynamicsMapper",
          DiagnosticSeverity.Error,
          isEnabledByDefault: true);
+
+        public static readonly DiagnosticDescriptor DuplicateSchemas = new(
+            id: "DYM007",
+            title: "Dulplicate schama names",
+            messageFormat: "{0} has other attributes with the same schemaname",
+            category: "DynamicsMapper",
+            DiagnosticSeverity.Warning,
+            isEnabledByDefault: true);
+
     }
 }

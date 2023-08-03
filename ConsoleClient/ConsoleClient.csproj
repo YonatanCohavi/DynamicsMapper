@@ -10,8 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DynamicsMapper" Version="1.0.0" />
-    <PackageReference Include="Microsoft.PowerPlatform.Dataverse.Client" Version="1.1.9" />
+    <ProjectReference Include="..\Domain\Domain.csproj" />
   </ItemGroup>
 
 </Project>

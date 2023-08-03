@@ -1,7 +1,6 @@
-﻿using ConsoleClient.Enums;
-using DynamicsMapper.Abstractions;
+﻿using DynamicsMapper.Abstractions;
 
-namespace ConsoleClient.Models
+namespace Domain.Models
 {
     [CrmEntity("contact")]
     public partial class Contact
@@ -10,12 +9,6 @@ namespace ConsoleClient.Models
         public Guid? ContactId { get; set; }
         [CrmField("rtm_o_test", Mapping = MappingType.MultipleOptions)]
         public int[]? Tests { get; set; }
-        [CrmField("rtm_o_test2", Mapping = MappingType.MultipleOptions)]
-        public ContactType[]? Tests2 { get; set; }
-        [CrmField("rtm_l_account", Mapping = MappingType.Options)]
-        public ContactType ContantType { get; set; }
-        [CrmField("rtm_l_account", Mapping = MappingType.Options)]
-        public int? IntContantType { get; set; }
         [CrmField("firstname")]
         public string? Firstname { get; set; }
         [CrmField("rtm_s_lastname")]
@@ -31,6 +24,6 @@ namespace ConsoleClient.Models
         [CrmField("rtm_l_account", Target = "account")]
         public Guid? AccountId { get; set; }
         [CrmField("rtm_l_account", Mapping = MappingType.Formatted)]
-        public string? AccountName { get; set; }
+        public string? AccountName { get; }
     }
 }

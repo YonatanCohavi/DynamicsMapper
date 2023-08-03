@@ -31,6 +31,6 @@ namespace DebuggerClient.Models
         [CrmField("rtm_l_account", Target = "account")]
         public Guid? AccountId { get; set; }
         [CrmField("rtm_l_account", Mapping = MappingType.Formatted)]
-        public string? AccountName { get; set; }
+        public string? AccountName { get; }
     }
 }
