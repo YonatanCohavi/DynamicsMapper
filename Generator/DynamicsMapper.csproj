@@ -12,7 +12,7 @@
 
     <PackageProjectUrl>https://github.com/YonatanCohavi/DynamicsMapper</PackageProjectUrl>
     <PackageId>YC.DynamicsMapper</PackageId>
-    <PackageVersion>1.0.1-alpha</PackageVersion>
+    <PackageVersion>1.0.2-alpha</PackageVersion>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageDescription>
       A .NET source generator for generating dynamics crm Enity mappings.

@@ -12,9 +12,9 @@ namespace DebuggerClient.Models
         public int[]? Tests { get; set; }
         [CrmField("rtm_o_test2", Mapping = MappingType.MultipleOptions)]
         public int[]? Tests2 { get; set; }
-        [CrmField("rtm_l_account", Mapping = MappingType.Options)]
-        public ContactType ContantType { get; set; }
-        [CrmField("rtm_l_account", Mapping = MappingType.Options)]
+        [CrmField("rtm_o_type", Mapping = MappingType.Options)]
+        public ContactType? ContactType { get; set; }
+        [CrmField("rtm_o_type2", Mapping = MappingType.Options)]
         public int? IntContantType { get; set; }
         [CrmField("rtm_s_firstname")]
         public string? Firstname { get; set; }
@@ -26,7 +26,7 @@ namespace DebuggerClient.Models
         public DateTime? Birthdate { get; set; }
         [CrmField("rtm_i_age")]
         public int? Age { get; set; }
-        [CrmField("rtm_l_account", Mapping = MappingType.Money)]
+        [CrmField("sal", Mapping = MappingType.Money)]
         public decimal? Sallery { get; set; }
         [CrmField("rtm_l_account", Target = "account")]
         public Guid? AccountId { get; set; }

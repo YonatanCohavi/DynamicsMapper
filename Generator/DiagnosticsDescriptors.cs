@@ -55,7 +55,7 @@ namespace DynamicsMapper
         public static readonly DiagnosticDescriptor DuplicateSchemas = new(
             id: "DYM007",
             title: "Dulplicate schama names",
-            messageFormat: "{0} has other attributes with the same schemaname",
+            messageFormat: "{0} has other attributes with the schema name \"{1}\"",
             category: "DynamicsMapper",
             DiagnosticSeverity.Warning,
             isEnabledByDefault: true);

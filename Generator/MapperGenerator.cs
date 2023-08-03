@@ -1,5 +1,4 @@
 ﻿using DynamicsMapper.Abstractions;
-using DynamicsMapper.Attributes;
 using DynamicsMapper.Extentions;
 using DynamicsMapper.Helpers;
 using DynamicsMapper.Models;
@@ -9,7 +8,6 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.ComponentModel.Design.Serialization;
 using System.Linq;
 
 namespace DynamicsMapper
@@ -62,8 +60,8 @@ namespace DynamicsMapper
                 }
 
                 var entityName = (string)crmAttributeData.ConstructorArguments[0].Value!;
-                var properties = mapperSymbol.GetMembers().OfType<IPropertySymbol>();
-
+                var properties = mapperSymbol.GetAllProperties();
+                var hideingFunctions = mapperSymbol.InheritsFromDecoratedClass(crmEntityAttributeSymbol);
                 var generationDetails = ExtractAttributes(properties, crmFieldAttributeSymbol, ctx)
                     .ToArray();
 
@@ -71,10 +69,10 @@ namespace DynamicsMapper
                     .GroupBy(dg => dg.SchemaName)
                     .Where(g => g.Count() > 1)
                     .SelectMany(g => g);
-                    
+
 
                 foreach (var duplicate in duplicates)
-                    mapperSymbol.SetDiagnostic(ctx, DiagnosticsDescriptors.DuplicateSchemas, mapperSymbol.Name);
+                    duplicate.PropertySymbol.SetDiagnostic(ctx, DiagnosticsDescriptors.DuplicateSchemas, mapperSymbol.Name, duplicate.SchemaName);
 
                 if (generationDetails.Where(gd => gd.Mapping == MappingType.PrimaryId).Count() > 1)
                 {
@@ -82,7 +80,7 @@ namespace DynamicsMapper
                     continue;
                 }
                 var className = mapperSyntax.Identifier.ValueText;
-                var classContent = GeneratePartialMapperClass(mapperSyntax, entityName, generationDetails, ctx);
+                var classContent = GeneratePartialMapperClass(mapperSyntax, entityName, hideingFunctions, generationDetails, ctx);
 
                 // verify compilation
                 classContent = SyntaxFactory
@@ -94,7 +92,7 @@ namespace DynamicsMapper
             }
         }
 
-        private static string GeneratePartialMapperClass(ClassDeclarationSyntax mapperSyntax, string entityName, FieldGenerationDetails[] generationDetails, SourceProductionContext ctx)
+        private static string GeneratePartialMapperClass(ClassDeclarationSyntax mapperSyntax, string entityName, bool inherintsFromAnotherCrmEntity, FieldGenerationDetails[] generationDetails, SourceProductionContext ctx)
         {
             var @namespace = mapperSyntax.GetParent<NamespaceDeclarationSyntax>()!.Name.ToString();
             var className = mapperSyntax.Identifier.ValueText;
@@ -121,20 +119,21 @@ namespace DynamicsMapper
                 if (hasSetter)
                     toModelContent.Add(mappings.Value.ToModel);
             }
+            var memberDecoration = inherintsFromAnotherCrmEntity ? "new " : string.Empty;
             using (writer.BeginScope($"namespace {@namespace}"))
             {
                 using (writer.BeginScope($"public partial class {className}"))
                 {
-                    writer.AppendLine($"public static ColumnSet ColumnSet = new ColumnSet({string.Join(", ", columns)});");
+                    writer.AppendLine($"public static {memberDecoration}ColumnSet ColumnSet = new ColumnSet({string.Join(", ", columns)});");
                     writer.AppendLine();
-                    using (writer.BeginScope($"public Entity ToEntity()"))
+                    using (writer.BeginScope($"public {memberDecoration}Entity ToEntity()"))
                     {
                         writer.AppendLine($"var entity = new Entity(\"{entityName}\");");
                         toEntityContent.ForEach(writer.AppendLine);
                         writer.AppendLine("return entity;");
                     }
                     writer.AppendLine();
-                    using (writer.BeginScope($"public static {className} FromEntity(Entity entity)"))
+                    using (writer.BeginScope($"public static {memberDecoration}{className} FromEntity(Entity entity)"))
                     {
                         writer.AppendLine($"var {modelName} = new {className}();");
                         toModelContent.ForEach(writer.AppendLine);
