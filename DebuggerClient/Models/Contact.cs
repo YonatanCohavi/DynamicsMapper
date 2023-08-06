@@ -4,7 +4,7 @@ using DynamicsMapper.Abstractions;
 namespace DebuggerClient.Models
 {
     [CrmEntity("contact")]
-    public partial class Contact
+    public class Contact
     {
         [CrmField("contactid", Mapping = MappingType.PrimaryId)]
         public Guid? ContactId { get; set; }

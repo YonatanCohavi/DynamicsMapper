@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 namespace DebuggerClient.Models
 {
     [CrmEntity("account")]
-    public partial class Account
+    public class Account
     {
         [CrmField("accountid",Mapping = MappingType.PrimaryId)]
         public Guid AccountId { get; set; }
