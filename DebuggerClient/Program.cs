@@ -1,5 +1,6 @@
 ﻿// See https://aka.ms/new-console-template for more information
 using DebuggerClient.Models;
+using Microsoft.Xrm.Sdk;
+using DynamicsMapper.Mappers;
 
-FullCity.FromEntity(null);
-Console.WriteLine("Hello, World!");
+var x = new ContactMapper();

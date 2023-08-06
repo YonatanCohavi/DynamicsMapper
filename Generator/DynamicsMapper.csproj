@@ -55,5 +55,9 @@
     <ProjectReference Include="..\DynamicsMapper.Abstractions\DynamicsMapper.Abstractions.csproj" GeneratePathProperty="true" PrivateAssets="All" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Attributes\" />
+  </ItemGroup>
+
 
 </Project>
