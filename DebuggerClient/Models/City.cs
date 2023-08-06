@@ -3,7 +3,7 @@
 namespace DebuggerClient.Models
 {
     [CrmEntity("city")]
-    public partial class CityBase
+    public class CityBase
     {
         [CrmField("cityid", Mapping = MappingType.PrimaryId)]
         public Guid CityId { get; set; }
@@ -12,7 +12,7 @@ namespace DebuggerClient.Models
     }
 
     [CrmEntity("city")]
-    public partial class FullCity : CityBase
+    public class FullCity : CityBase
     {
     }
 

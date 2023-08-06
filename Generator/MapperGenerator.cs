@@ -56,6 +56,9 @@ namespace DynamicsMapper
                     continue;
 
                 var entityName = (string)crmAttributeData.ConstructorArguments[0].Value!;
+                var mapperName = crmAttributeData.NamedArguments.FirstOrDefault(na => na.Key == nameof(CrmEntityAttribute.MapperName));
+                var mapperClassName = mapperName.Value.Value as string ?? $"{mapperSyntax.Identifier.ValueText}Mapper";
+
                 var properties = mapperSymbol.GetAllProperties();
                 var hideingFunctions = mapperSymbol.InheritsFromDecoratedClass(crmEntityAttributeSymbol);
                 var generationDetails = ExtractAttributes(properties, crmFieldAttributeSymbol, ctx)
@@ -75,7 +78,6 @@ namespace DynamicsMapper
                     mapperSymbol.SetDiagnostic(ctx, DiagnosticsDescriptors.MultiplePrimaryIds, mapperSymbol.Name);
                     continue;
                 }
-                var mapperClassName = $"{mapperSyntax.Identifier.ValueText}Mapper";
 
                 var mapperClass = GenerateMapperClass(mapperSyntax, entityName, generationDetails, mapperClassName, ctx);
                 // verify compilation
@@ -84,7 +86,7 @@ namespace DynamicsMapper
                       .NormalizeWhitespace()
                       .GetText()
                       .ToString();
-                ctx.AddSource($"{mapperClassName}.g.cs", mapperClass.Code);
+                ctx.AddSource($"{mapperClass.ClassName}.g.cs", mapperClass.Code);
             }
         }
 
@@ -165,6 +167,7 @@ namespace DynamicsMapper
             writer.AddUsing("Microsoft.Xrm.Sdk");
             writer.AddUsing("Microsoft.Xrm.Sdk.Query");
             writer.AddUsing("DynamicsMapper.Extension");
+            writer.AddUsing("DynamicsMapper.Mappers");
             writer.AddUsing("System");
             writer.AppendLine();
             var className = mapperSyntax.Identifier.ValueText;
@@ -218,7 +221,7 @@ namespace DynamicsMapper
             return new MapperClassDetails
             {
                 Code = writer.ToString(),
-                ClassName = className
+                ClassName = mapperClassName
             };
         }
         private static Mappings? GetMapperContent(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
