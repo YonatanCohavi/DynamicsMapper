@@ -59,6 +59,5 @@ namespace DynamicsMapper
             category: "DynamicsMapper",
             DiagnosticSeverity.Warning,
             isEnabledByDefault: true);
-
     }
 }
