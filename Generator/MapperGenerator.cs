@@ -119,8 +119,8 @@ namespace DynamicsMapper
                     writer.AppendLine("public string Entityname { get; }");
                     writer.AppendLine("public ColumnSet Columns { get; }");
                     writer.AppendLine("public T Map(Entity entity);");
+                    writer.AppendLine("public T? Map(Entity entity, string alias);");
                     writer.AppendLine("public Entity Map(T model);");
-                    writer.AppendLine("public T? FromAliasedEntity(Entity entity, string alias);");
                 }
             }
             var classContent = SyntaxFactory
@@ -144,11 +144,11 @@ namespace DynamicsMapper
             {
                 using (writer.BeginScope($"public static class EntityExtension"))
                 {
-                    using (writer.BeginScope($"public static Entity GetAliasedEntity(this Entity entity, string alias)"))
+                    using (writer.BeginScope($"public static Entity? GetAliasedEntity(this Entity entity, string alias)"))
                     {
+                        writer.AppendLine("var attributes = entity.Attributes.Where(e => e.Key.StartsWith(alias)).ToArray();");
+                        writer.AppendLine("if (!attributes.Any()) return null;");
                         writer.AppendLine("var aliasEntity = new Entity();");
-                        writer.AppendLine("var attributes = entity.Attributes.Where(e => e.Key.Contains(alias)).ToArray();");
-                        writer.AppendLine("if (!attributes.Any()) return aliasEntity;");
                         using (writer.BeginScope($"foreach (var attribute in attributes)"))
                         {
                             writer.AppendLine("if (!(attribute.Value is AliasedValue aliasedValued)) continue;");
@@ -216,6 +216,13 @@ namespace DynamicsMapper
                         writer.AppendLine("return entity;");
                     }
                     writer.AppendLine();
+                    using (writer.BeginScope($"public {className}? Map(Entity entity, string alias)"))
+                    {
+                        writer.AppendLine($"var aliased = entity.GetAliasedEntity(alias);");
+                        writer.AppendLine($"if (aliased is null) return null;");
+                        writer.AppendLine($"return Map(aliased);");
+
+                    }
                     using (writer.BeginScope($"public {className} Map(Entity entity)"))
                     {
                         writer.AppendLine($"if (entity?.LogicalName != entityname)");
@@ -223,12 +230,6 @@ namespace DynamicsMapper
                         writer.AppendLine($"var {modelName} = new {className}();");
                         toModelContent.ForEach(writer.AppendLine);
                         writer.AppendLine($"return {modelName};");
-                    }
-                    using (writer.BeginScope($"public {className}? FromAliasedEntity(Entity entity, string alias)"))
-                    {
-                        writer.AppendLine($"var aliased = entity.GetAliasedEntity(alias);");
-                        writer.AppendLine($"if (aliased is null) return null;");
-                        writer.AppendLine($"return Map(aliased);");
                     }
                 }
             }
@@ -279,7 +280,7 @@ namespace DynamicsMapper
             // TODO: handle none nullable attribute
             if (nullable || !nullable)
             {
-                cw.AppendLine($"var mapped_{linkDetails.EntityName} = {mapperName}.FromAliasedEntity(entity, \"{attribute.Alias}\");");
+                cw.AppendLine($"var mapped_{linkDetails.EntityName} = {mapperName}.Map(entity, \"{attribute.Alias}\");");
                 cw.AppendLine($"if (mapped_{linkDetails.EntityName} != null)");
                 cw.AppendLine($"{modelName}.{attribute.PropertySymbol.Name} = mapped_{linkDetails.EntityName};");
             }
