@@ -6,6 +6,6 @@ partial class Program
     static void Main(string[] args)
     {
         var contact = new Contact();
-        var entity = contact.ToEntity();
+        var mapper = new ContactMapper();
     }
 }

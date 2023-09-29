@@ -12,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DynamicsMapper.Abstractions\DynamicsMapper.Abstractions.csproj" OutputItemType="Analyzer"/>
+    <ProjectReference Include="..\DynamicsMapper.Abstractions\DynamicsMapper.Abstractions.csproj" OutputItemType="Analyzer" />
     <ProjectReference Include="..\Generator\DynamicsMapper.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>

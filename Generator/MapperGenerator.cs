@@ -9,7 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Security.Cryptography.X509Certificates;
+using System.Text;
 
 namespace DynamicsMapper
 {
@@ -35,16 +35,19 @@ namespace DynamicsMapper
                 return;
             GenerateEntityExtentionClass(ctx);
             GenerateIEntityMapper(ctx);
+            var crmLinkAttributeSymbol = compilation.GetTypeByMetadataName(typeof(CrmLinkAttribute).FullName);
             var crmEntityAttributeSymbol = compilation.GetTypeByMetadataName(typeof(CrmEntityAttribute).FullName);
             var crmFieldAttributeSymbol = compilation.GetTypeByMetadataName(typeof(CrmFieldAttribute).FullName);
 
             if (crmFieldAttributeSymbol == null)
                 return;
+            if (crmLinkAttributeSymbol == null)
+                return;
 
 
             if (crmEntityAttributeSymbol == null)
                 return;
-            var createdMappers = new Dictionary<string, List<INamedTypeSymbol>>();
+            var createdMappers = new List<MapperDetails>();
             foreach (var mapperSyntax in mappers.Distinct())
             {
                 var mapperModel = compilation.GetSemanticModel(mapperSyntax.SyntaxTree);
@@ -54,32 +57,42 @@ namespace DynamicsMapper
                 var crmAttributeData = mapperSymbol.GetAttribute(crmEntityAttributeSymbol).FirstOrDefault();
                 if (crmAttributeData is null)
                     continue;
-
+                var a = mapperSyntax.Identifier.ValueText;
                 var entityName = (string)crmAttributeData.ConstructorArguments[0].Value!;
                 var mapperName = crmAttributeData.NamedArguments.FirstOrDefault(na => na.Key == nameof(CrmEntityAttribute.MapperName));
                 var mapperClassName = mapperName.Value.Value as string ?? $"{mapperSyntax.Identifier.ValueText}Mapper";
+                createdMappers.Add(new MapperDetails
+                {
+                    ClassDeclarationSyntax = mapperSyntax,
+                    MapperClassName = mapperClassName,
+                    MapperSymbol = mapperSymbol,
+                    EntityName = entityName,
+                });
+            }
+            foreach (var mapperSyntax in mappers.Distinct())
+            {
+                var details = createdMappers.Single(m => m.ClassDeclarationSyntax == mapperSyntax);
+                var properties = details.MapperSymbol.GetAllProperties();
 
-                var properties = mapperSymbol.GetAllProperties();
-                var hideingFunctions = mapperSymbol.InheritsFromDecoratedClass(crmEntityAttributeSymbol);
-                var generationDetails = ExtractAttributes(properties, crmFieldAttributeSymbol, ctx)
+                var fieldsGenerationDetails = ExtractAttributes(properties, crmFieldAttributeSymbol, crmLinkAttributeSymbol, ctx)
                     .ToArray();
 
-                var duplicateSchemas = generationDetails.Where(dg => dg.Mapping != MappingType.Formatted)
+                var duplicateSchemas = fieldsGenerationDetails.Where(dg => dg.Mapping != MappingType.Formatted)
                     .GroupBy(dg => dg.SchemaName)
                     .Where(g => g.Count() > 1)
                     .SelectMany(g => g);
 
 
                 foreach (var duplicate in duplicateSchemas)
-                    duplicate.PropertySymbol.SetDiagnostic(ctx, DiagnosticsDescriptors.DuplicateSchemas, mapperSymbol.Name, duplicate.SchemaName);
+                    duplicate.PropertySymbol.SetDiagnostic(ctx, DiagnosticsDescriptors.DuplicateSchemas, details.MapperSymbol.Name, duplicate.SchemaName);
 
-                if (generationDetails.Where(gd => gd.Mapping == MappingType.PrimaryId).Count() > 1)
+                if (fieldsGenerationDetails.Count(gd => gd.Mapping == MappingType.PrimaryId) > 1)
                 {
-                    mapperSymbol.SetDiagnostic(ctx, DiagnosticsDescriptors.MultiplePrimaryIds, mapperSymbol.Name);
+                    details.MapperSymbol.SetDiagnostic(ctx, DiagnosticsDescriptors.MultiplePrimaryIds, details.MapperSymbol.Name);
                     continue;
                 }
 
-                var mapperClass = GenerateMapperClass(mapperSyntax, entityName, generationDetails, mapperClassName, ctx);
+                var mapperClass = GenerateMapperClass(mapperSyntax, details.EntityName, fieldsGenerationDetails, details.MapperClassName, createdMappers, ctx);
                 // verify compilation
                 mapperClass.Code = SyntaxFactory
                       .ParseCompilationUnit(mapperClass.Code)
@@ -107,7 +120,7 @@ namespace DynamicsMapper
                     writer.AppendLine("public ColumnSet Columns { get; }");
                     writer.AppendLine("public T Map(Entity entity);");
                     writer.AppendLine("public Entity Map(T model);");
-                    writer.AppendLine("public T FromAliasedEntity(Entity entity, string alias);");
+                    writer.AppendLine("public T? FromAliasedEntity(Entity entity, string alias);");
                 }
             }
             var classContent = SyntaxFactory
@@ -155,9 +168,9 @@ namespace DynamicsMapper
                                  .ToString();
             ctx.AddSource($"EntityExtentions.g.cs", classContent);
         }
-        private static MapperClassDetails GenerateMapperClass(ClassDeclarationSyntax mapperSyntax, string entityName, FieldGenerationDetails[] generationDetails, string mapperClassName, SourceProductionContext ctx)
+        private static MapperClassDetails GenerateMapperClass(ClassDeclarationSyntax mapperSyntax, string entityName, FieldGenerationDetails[] generationDetails, string mapperClassName, ICollection<MapperDetails> createdMappers, SourceProductionContext ctx)
         {
-            var columns = generationDetails.Select(a => $"\"{a.SchemaName}\"").Distinct().ToList();
+            var columns = generationDetails.Where(a => !string.IsNullOrEmpty(a.SchemaName)).Select(a => $"\"{a.SchemaName}\"").Distinct().ToList();
             var @namespace = mapperSyntax.GetParent<NamespaceDeclarationSyntax>()!.Name.ToString();
 
             var writer = new CodeWriter();
@@ -177,7 +190,7 @@ namespace DynamicsMapper
 
             foreach (var attribute in generationDetails)
             {
-                var mappings = GetMapperContent(modelName, attribute, ctx);
+                var mappings = GetMapperContent(modelName, attribute, createdMappers, ctx);
                 var hasSetter = attribute.PropertySymbol.SetMethod is not null;
 
                 if (!mappings.HasValue)
@@ -189,7 +202,7 @@ namespace DynamicsMapper
 
             using (writer.BeginScope($"namespace {@namespace}"))
             {
-                using (writer.BeginScope($"public class {mapperClassName} : IEntityMapper<{className}> "))
+                using (writer.BeginScope($"public class {mapperClassName} : IEntityMapper<{className}>"))
                 {
                     writer.AppendLine($"private static readonly string[] columns = new[] {{{string.Join(", ", columns)}}};");
                     writer.AppendLine($"public ColumnSet Columns => new ColumnSet(columns);");
@@ -211,9 +224,10 @@ namespace DynamicsMapper
                         toModelContent.ForEach(writer.AppendLine);
                         writer.AppendLine($"return {modelName};");
                     }
-                    using (writer.BeginScope($"public {className} FromAliasedEntity(Entity entity, string alias)"))
+                    using (writer.BeginScope($"public {className}? FromAliasedEntity(Entity entity, string alias)"))
                     {
                         writer.AppendLine($"var aliased = entity.GetAliasedEntity(alias);");
+                        writer.AppendLine($"if (aliased is null) return null;");
                         writer.AppendLine($"return Map(aliased);");
                     }
                 }
@@ -224,7 +238,7 @@ namespace DynamicsMapper
                 ClassName = mapperClassName
             };
         }
-        private static Mappings? GetMapperContent(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
+        private static Mappings? GetMapperContent(string modelName, FieldGenerationDetails attribute, ICollection<MapperDetails> createdMappers, SourceProductionContext ctx)
         {
             return attribute.Mapping switch
             {
@@ -235,8 +249,42 @@ namespace DynamicsMapper
                 MappingType.MultipleOptions => GenerateMultipleOptionsMappings(modelName, attribute, ctx),
                 MappingType.Options => GenerateOptionsMappings(modelName, attribute, ctx),
                 MappingType.PrimaryId => GeneratePrimaryIdMappings(modelName, attribute, ctx),
+                MappingType.Link => GenerateLinkMappings(modelName, attribute, createdMappers, ctx),
                 _ => throw new Exception($"{attribute.Mapping} is not defined"),
-            };
+            }; ;
+        }
+
+        private static Mappings? GenerateLinkMappings(string modelName, FieldGenerationDetails attribute, ICollection<MapperDetails> createdMappers, SourceProductionContext ctx)
+        {
+            var typeSymbol = attribute.PropertySymbol.Type.GetUnelyingType().Name;
+            var syntaxReference = attribute.PropertySymbol.Type.DeclaringSyntaxReferences.FirstOrDefault()
+                ?? throw new Exception("syntaxReference not found");
+            if (syntaxReference.GetSyntax() is not ClassDeclarationSyntax mapperSyntax)
+                throw new Exception("syntax is not  ClassDeclarationSyntax");
+
+            var mapperNameSpace = mapperSyntax.GetParent<NamespaceDeclarationSyntax>()!.Name.ToString();
+            var linkDetails = createdMappers.SingleOrDefault(m => m.ClassDeclarationSyntax == mapperSyntax);
+            if (linkDetails is null)
+            {
+                //TODO: Fix error message
+                attribute.PropertySymbol.SetInvalidTypeDiagnostic(ctx, typeSymbol, MappingType.Basic, Array.Empty<string>());
+                return null;
+            }
+            string toModel;
+            var cw = new CodeWriter();
+            var nullable = attribute.PropertySymbol.NullableAnnotation == NullableAnnotation.Annotated;
+            var mapperName = $"{char.ToLower(linkDetails.MapperClassName[0])}{linkDetails.MapperClassName.Substring(1)}";
+            cw.AppendLine($"var {mapperName} = new {mapperNameSpace}.{linkDetails.MapperClassName}();");
+
+            // TODO: handle none nullable attribute
+            if (nullable || !nullable)
+            {
+                cw.AppendLine($"var mapped_{linkDetails.EntityName} = {mapperName}.FromAliasedEntity(entity, \"{attribute.Alias}\");");
+                cw.AppendLine($"if (mapped_{linkDetails.EntityName} != null)");
+                cw.AppendLine($"{modelName}.{attribute.PropertySymbol.Name} = mapped_{linkDetails.EntityName};");
+            }
+            toModel = cw.ToString();
+            return new Mappings(toModel, string.Empty);
         }
 
         private static Mappings? GeneratePrimaryIdMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
@@ -250,7 +298,7 @@ namespace DynamicsMapper
                 return null;
             }
             string toEntity;
-            var toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.Id;";
+            var toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<Guid>(\"{attribute.SchemaName}\");";
             if (nullable)
             {
                 toEntity = $"entity.Id = {modelName}.{attribute.PropertySymbol.Name}.HasValue ? {modelName}.{attribute.PropertySymbol.Name}.Value : Guid.Empty;";
@@ -422,10 +470,16 @@ namespace DynamicsMapper
             return new Mappings(toModel, toEntity);
         }
 
-        private static IEnumerable<FieldGenerationDetails> ExtractAttributes(IEnumerable<IPropertySymbol> properties, INamedTypeSymbol crmFieldAttributeSymbol, SourceProductionContext ctx)
+        private static IEnumerable<FieldGenerationDetails> ExtractAttributes(IEnumerable<IPropertySymbol> properties, INamedTypeSymbol crmFieldAttributeSymbol, INamedTypeSymbol crmLinkAttributeSymbol, SourceProductionContext ctx)
         {
             foreach (var propertySymbol in properties)
             {
+                if (propertySymbol.HasAttribute(crmLinkAttributeSymbol))
+                {
+                    var attributeData = propertySymbol.GetAttribute(crmLinkAttributeSymbol).First();
+                    var alias = (string)attributeData.ConstructorArguments[0].Value!;
+                    yield return FieldGenerationDetails.CreateAlias(propertySymbol, alias);
+                }
                 if (propertySymbol.HasAttribute(crmFieldAttributeSymbol))
                 {
                     var attributeData = propertySymbol.GetAttribute(crmFieldAttributeSymbol).First();

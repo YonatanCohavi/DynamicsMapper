@@ -6,6 +6,7 @@ namespace DebuggerClient.Models
     [CrmEntity("contact")]
     public class Contact
     {
+        const string AccountAlias = "account";
         [CrmField("contactid", Mapping = MappingType.PrimaryId)]
         public Guid? ContactId { get; set; }
         [CrmField("rtm_o_test", Mapping = MappingType.MultipleOptions)]
@@ -32,5 +33,8 @@ namespace DebuggerClient.Models
         public Guid? AccountId { get; set; }
         [CrmField("rtm_l_account", Mapping = MappingType.Formatted)]
         public string? AccountName { get; }
+        [CrmLink(AccountAlias)]
+        public Account? Account { get; set; }
+
     }
 }

@@ -9,5 +9,6 @@
         Options = 5,
         MultipleOptions = 6,
         PrimaryId = 7,
+        Link = 8,
     }
 }

@@ -10,11 +10,22 @@ namespace DynamicsMapper.Models
 
     internal class FieldGenerationDetails
     {
-        public MappingType Mapping { get; }
-        public string SchemaName { get; }
-        public IPropertySymbol PropertySymbol { get; }
-        public string? Target { get; }
+        public MappingType Mapping { get; private set; }
+        public string SchemaName { get; private set; }
+        public IPropertySymbol PropertySymbol { get; private set; }
+        public string? Target { get; private set; }
+        public string? Alias { get; private set; }
 
+        private FieldGenerationDetails() { }
+        public static FieldGenerationDetails CreateAlias(IPropertySymbol propertySymbol, string alias)
+        {
+            return new FieldGenerationDetails
+            {
+                Mapping = MappingType.Link,
+                PropertySymbol = propertySymbol,
+                Alias = alias
+            };
+        }
         public FieldGenerationDetails(string logicalName, IPropertySymbol propertySymbol, MappingType mapping = MappingType.Basic, string? target = null)
         {
             SchemaName = logicalName;

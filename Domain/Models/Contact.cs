@@ -3,7 +3,7 @@
 namespace Domain.Models
 {
     [CrmEntity("contact")]
-    public partial class Contact
+    public class Contact
     {
         [CrmField("activityid", Mapping = MappingType.PrimaryId)]
         public Guid? ContactId { get; set; }
