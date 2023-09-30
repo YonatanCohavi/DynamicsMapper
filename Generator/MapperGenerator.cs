@@ -215,16 +215,21 @@ namespace DynamicsMapper
                         toEntityContent.ForEach(writer.AppendLine);
                         writer.AppendLine("return entity;");
                     }
-                    writer.AppendLine();
-                    using (writer.BeginScope($"public {className}? Map(Entity entity, string alias)"))
-                    {
-                        writer.AppendLine($"var aliased = entity.GetAliasedEntity(alias);");
-                        writer.AppendLine($"if (aliased is null) return null;");
-                        writer.AppendLine($"return Map(aliased);");
+                    writer.AppendLine($"public {className}? Map(Entity entity, string alias) => InternalMap(entity, alias);");
+                    writer.AppendLine($"public {className} Map(Entity entity) => InternalMap(entity)!;");
 
-                    }
-                    using (writer.BeginScope($"public {className} Map(Entity entity)"))
+                    using (writer.BeginScope($"private static {className}? InternalMap(Entity source, string? alias = null)"))
                     {
+                        writer.AppendLine($"Entity? entity;");
+                        using (writer.BeginScope($"if (string.IsNullOrEmpty(alias))"))
+                        {
+                            writer.AppendLine($"entity = source;");
+                        }
+                        using (writer.BeginScope($"else"))
+                        {
+                            writer.AppendLine($"entity = source.GetAliasedEntity(alias);");
+                            writer.AppendLine($"if (entity is null) return null;");
+                        }
                         writer.AppendLine($"if (entity?.LogicalName != entityname)");
                         writer.AppendLine($"throw new ArgumentException($\"entity LogicalName expected to be {{entityname}} recived: {{entity?.LogicalName}}\",\"entity\");");
                         writer.AppendLine($"var {modelName} = new {className}();");
@@ -280,7 +285,7 @@ namespace DynamicsMapper
             // TODO: handle none nullable attribute
             if (nullable || !nullable)
             {
-                cw.AppendLine($"var mapped_{linkDetails.EntityName} = {mapperName}.Map(entity, \"{attribute.Alias}\");");
+                cw.AppendLine($"var mapped_{linkDetails.EntityName} = {mapperName}.Map(source, \"{attribute.Alias}\");");
                 cw.AppendLine($"if (mapped_{linkDetails.EntityName} != null)");
                 cw.AppendLine($"{modelName}.{attribute.PropertySymbol.Name} = mapped_{linkDetails.EntityName};");
             }

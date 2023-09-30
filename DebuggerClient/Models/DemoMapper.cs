@@ -3,6 +3,7 @@ using Microsoft.Xrm.Sdk.Query;
 using DynamicsMapper.Extension;
 using DynamicsMapper.Mappers;
 using System;
+using System.Text.RegularExpressions;
 
 namespace DebuggerClient.Models
 {
@@ -24,23 +25,32 @@ namespace DebuggerClient.Models
             return entity;
         }
 
-        public Account? Map(Entity source, string alias)
-        { 
-            var aliased = source.GetAliasedEntity(alias);
-        }
-        public Account Map(Entity source, string? alias = null)
+        public Account? Map(Entity entity, string alias) => InternalMap(entity, alias);
+        public Account Map(Entity entity) => InternalMap(entity)!;
+        private static Account? InternalMap(Entity source, string? alias = null)
         {
-            var entity = string.IsNullOrEmpty(alias) ? source : source.GetAliasedEntity(alias);
+            Entity? entity;
+
+            if (string.IsNullOrEmpty(alias))
+            {
+                entity = source;
+            }
+            else
+            {
+                entity = source.GetAliasedEntity(alias);
+                if (entity is null)
+                    return null;
+            }
+
             if (entity?.LogicalName != entityname)
-                throw new ArgumentException($"entity LogicalName expected to be {entityname} recived: {entity?.LogicalName}", "entity");
+                throw new ArgumentException($"entity LogicalName expected to be {entityname} recived: {entity?.LogicalName}", nameof(source));
             var account = new Account();
             account.AccountId = entity.GetAttributeValue<Guid>("accountid");
             var contactMapper = new DebuggerClient.Models.ContactMapper();
-            var mapped_contact = contactMapper.Map(entity, "contact");
+            var mapped_contact = contactMapper.Map(source, "contact");
             if (mapped_contact != null)
                 account.Contact = mapped_contact;
             return account;
         }
     }
-}
 }
