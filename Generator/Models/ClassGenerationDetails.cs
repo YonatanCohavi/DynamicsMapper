@@ -11,26 +11,27 @@ namespace DynamicsMapper.Models
     internal class FieldGenerationDetails
     {
         public MappingType Mapping { get; private set; }
-        public string SchemaName { get; private set; }
+        public string? SchemaName { get; private set; }
         public IPropertySymbol PropertySymbol { get; private set; }
         public string? Target { get; private set; }
         public string? Alias { get; private set; }
 
-        private FieldGenerationDetails() { }
+        private FieldGenerationDetails(IPropertySymbol propertySymbol, MappingType mapping)
+        {
+            Mapping = mapping;
+            PropertySymbol = propertySymbol;
+        }
         public static FieldGenerationDetails CreateAlias(IPropertySymbol propertySymbol, string alias)
         {
-            return new FieldGenerationDetails
+            return new FieldGenerationDetails(propertySymbol, MappingType.Link)
             {
-                Mapping = MappingType.Link,
-                PropertySymbol = propertySymbol,
                 Alias = alias
             };
         }
         public FieldGenerationDetails(string logicalName, IPropertySymbol propertySymbol, MappingType mapping = MappingType.Basic, string? target = null)
+            :this(propertySymbol,mapping)
         {
             SchemaName = logicalName;
-            PropertySymbol = propertySymbol;
-            Mapping = mapping;
             Target = target;
         }
     }

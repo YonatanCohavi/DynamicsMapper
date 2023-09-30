@@ -59,5 +59,13 @@ namespace DynamicsMapper
             category: "DynamicsMapper",
             DiagnosticSeverity.Warning,
             isEnabledByDefault: true);
+
+        public static readonly DiagnosticDescriptor DestinationMapperNotFound = new(
+            id: "DYM008",
+            title: "Destination mapper not found",
+            messageFormat: "Destination mapper not found for the type '{0}'",
+            category: "DynamicsMapper",
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true);
     }
 }

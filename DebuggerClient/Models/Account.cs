@@ -13,6 +13,6 @@ namespace DebuggerClient.Models
         [CrmField("accountid",Mapping = MappingType.PrimaryId)]
         public Guid AccountId { get; set; }
         [CrmLink("contact")]
-        public Contact Contact { get; set; }
+        public Contact? Contact { get; set; }
     }
 }

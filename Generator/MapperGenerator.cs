@@ -61,13 +61,7 @@ namespace DynamicsMapper
                 var entityName = (string)crmAttributeData.ConstructorArguments[0].Value!;
                 var mapperName = crmAttributeData.NamedArguments.FirstOrDefault(na => na.Key == nameof(CrmEntityAttribute.MapperName));
                 var mapperClassName = mapperName.Value.Value as string ?? $"{mapperSyntax.Identifier.ValueText}Mapper";
-                createdMappers.Add(new MapperDetails
-                {
-                    ClassDeclarationSyntax = mapperSyntax,
-                    MapperClassName = mapperClassName,
-                    MapperSymbol = mapperSymbol,
-                    EntityName = entityName,
-                });
+                createdMappers.Add(new MapperDetails(mapperSyntax, mapperSymbol, mapperClassName, entityName));
             }
             foreach (var mapperSyntax in mappers.Distinct())
             {
@@ -77,14 +71,14 @@ namespace DynamicsMapper
                 var fieldsGenerationDetails = ExtractAttributes(properties, crmFieldAttributeSymbol, crmLinkAttributeSymbol, ctx)
                     .ToArray();
 
-                var duplicateSchemas = fieldsGenerationDetails.Where(dg => dg.Mapping != MappingType.Formatted)
-                    .GroupBy(dg => dg.SchemaName)
+                var duplicateSchemas = fieldsGenerationDetails.Where(dg => dg.Mapping != MappingType.Formatted && !string.IsNullOrEmpty(dg.SchemaName))
+                    .GroupBy(dg => dg.SchemaName!)
                     .Where(g => g.Count() > 1)
                     .SelectMany(g => g);
 
 
                 foreach (var duplicate in duplicateSchemas)
-                    duplicate.PropertySymbol.SetDiagnostic(ctx, DiagnosticsDescriptors.DuplicateSchemas, details.MapperSymbol.Name, duplicate.SchemaName);
+                    duplicate.PropertySymbol.SetDiagnostic(ctx, DiagnosticsDescriptors.DuplicateSchemas, details.MapperSymbol.Name, duplicate.SchemaName!);
 
                 if (fieldsGenerationDetails.Count(gd => gd.Mapping == MappingType.PrimaryId) > 1)
                 {
@@ -269,26 +263,24 @@ namespace DynamicsMapper
                 throw new Exception("syntax is not  ClassDeclarationSyntax");
 
             var mapperNameSpace = mapperSyntax.GetParent<NamespaceDeclarationSyntax>()!.Name.ToString();
-            var linkDetails = createdMappers.SingleOrDefault(m => m.ClassDeclarationSyntax == mapperSyntax);
-            if (linkDetails is null)
+            var foundLinkDetails = createdMappers.Where(m => m.ClassDeclarationSyntax == mapperSyntax);
+            if (foundLinkDetails.Count() != 1)
             {
-                //TODO: Fix error message
-                attribute.PropertySymbol.SetInvalidTypeDiagnostic(ctx, typeSymbol, MappingType.Basic, Array.Empty<string>());
+                attribute.PropertySymbol.SetDiagnostic(ctx, DiagnosticsDescriptors.DestinationMapperNotFound, attribute.PropertySymbol.ToDisplayString());
                 return null;
+
             }
+            var linkDetails = foundLinkDetails.Single();
+
             string toModel;
             var cw = new CodeWriter();
             var nullable = attribute.PropertySymbol.NullableAnnotation == NullableAnnotation.Annotated;
             var mapperName = $"{char.ToLower(linkDetails.MapperClassName[0])}{linkDetails.MapperClassName.Substring(1)}";
             cw.AppendLine($"var {mapperName} = new {mapperNameSpace}.{linkDetails.MapperClassName}();");
 
-            // TODO: handle none nullable attribute
-            if (nullable || !nullable)
-            {
-                cw.AppendLine($"var mapped_{linkDetails.EntityName} = {mapperName}.Map(source, \"{attribute.Alias}\");");
-                cw.AppendLine($"if (mapped_{linkDetails.EntityName} != null)");
-                cw.AppendLine($"{modelName}.{attribute.PropertySymbol.Name} = mapped_{linkDetails.EntityName};");
-            }
+            cw.AppendLine($"var mapped_{linkDetails.EntityName} = {mapperName}.Map(source, \"{attribute.Alias}\");");
+            cw.AppendLine($"if (mapped_{linkDetails.EntityName} != null)");
+            cw.AppendLine($"{modelName}.{attribute.PropertySymbol.Name} = mapped_{linkDetails.EntityName};");
             toModel = cw.ToString();
             return new Mappings(toModel, string.Empty);
         }

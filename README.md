@@ -61,4 +61,27 @@ var person = mapper.Map(entity);
 - `MultipleOptions`: This mapping type is used for multi-select option set fields in the CRM entity. A multi-select option set field is a field that allows the user to select multiple options from a predefined set of options.
 - `PrimaryId`: This mapping type is used for the primary ID field of the CRM entity. The primary ID field is the unique identifier for the entity record.
 
+## Define Linked Entities with the CrmLink Attribute
+
+In addition to the `CrmEntity` and `CrmField` attributes, you can also use the `CrmLink` attribute to map linked entities. This attribute allows you to establish relationships between different entities in your CRM.
+
+Here's how you can use it:
+
+```csharp
+[CrmEntity("order")]
+public class Order
+{
+    [CrmField("orderid", Mapping = MappingType.PrimaryId)]
+    public Guid OrderId { get; set; }
+
+    [CrmField("totalamount")]
+    public decimal? TotalAmount { get; set; }
+
+    [CrmLink("person")]
+    public Person Person { get; set; }
+}
+```
+
+In the example above, the `Order` class has a `Person` property that represents the person associated with the order. The `CrmLink` attribute is used to specify that this property maps to a linked entity in the CRM.
+
 And that's it! You can now use the source generator to generate mapper classes for your entity classes and easily map between your entity classes and the corresponding CRM entities.

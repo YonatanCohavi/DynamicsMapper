@@ -11,3 +11,4 @@ DYM004  | DynamicsMapper | Error    | Property has no target, target is mandator
 DYM005  | DynamicsMapper | Error    | Class has multiple 'PrimaryId' mappings.
 DYM006  | DynamicsMapper | Error    | CrmEntity decorated class must be partial.
 DYM007  | DynamicsMapper | Warning  | Dulplicate schama names.
+DYM008  | DynamicsMapper | Error    | Destination mapper not found for type.

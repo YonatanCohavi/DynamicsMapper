@@ -19,7 +19,7 @@ namespace Domain.Models
         public DateTime? Birthdate { get; set; }
         [CrmField("rtm_i_age")]
         public int? Age { get; set; }
-        [CrmField("rtm_l_account", Mapping = MappingType.Money)]
+        [CrmField("rtm-m_sal", Mapping = MappingType.Money)]
         public decimal? Sallery { get; set; }
         [CrmField("rtm_l_account", Target = "account")]
         public Guid? AccountId { get; set; }
