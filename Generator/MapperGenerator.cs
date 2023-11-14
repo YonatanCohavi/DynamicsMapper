@@ -107,7 +107,7 @@ namespace DynamicsMapper
             writer.AppendLine();
             using (writer.BeginScope($"namespace DynamicsMapper.Mappers"))
             {
-                using (writer.BeginScope($"public interface IEntityMapper<T>"))
+                using (writer.BeginScope($"public interface IEntityMapper<T> where T : class"))
                 {
                     writer.AppendLine("public string Entityname { get; }");
                     writer.AppendLine("public ColumnSet Columns { get; }");
