@@ -1,4 +1,6 @@
-# Using the Source Generator
+[![NuGet](https://img.shields.io/nuget/v/yc.dynamicsmapper.svg)](https://www.nuget.org/packages/yc.dynamicsmapper)
+
+# Using the SourceGenerator
 
 This document provides a brief overview of how to use the source generator to generate mapper classes for your entity classes.
 
