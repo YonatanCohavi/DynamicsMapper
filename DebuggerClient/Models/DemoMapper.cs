@@ -1,9 +1,7 @@
-﻿using Microsoft.Xrm.Sdk;
-using Microsoft.Xrm.Sdk.Query;
+﻿using DynamicsMapper.Abstractions;
 using DynamicsMapper.Extension;
-using DynamicsMapper.Mappers;
-using System;
-using System.Text.RegularExpressions;
+using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Query;
 
 namespace DebuggerClient.Models
 {

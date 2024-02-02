@@ -296,15 +296,15 @@ namespace DynamicsMapper
                 attribute.PropertySymbol.SetInvalidTypeDiagnostic(ctx, typeSymbol, MappingType.Basic, allowedTypes);
                 return null;
             }
-            string toEntity;
-            var toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<Guid>(\"{attribute.SchemaName}\");";
+            string toModel;
+            var toEntity = $"entity.Id = PrimaryIdMapper.MapToEntity({modelName}.{attribute.PropertySymbol.Name}) ?? Guid.Empty;";
             if (nullable)
             {
-                toEntity = $"entity.Id = {modelName}.{attribute.PropertySymbol.Name}.HasValue ? {modelName}.{attribute.PropertySymbol.Name}.Value : Guid.Empty;";
+                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = PrimaryIdMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
             }
             else
             {
-                toEntity = $"entity.Id = {modelName}.{attribute.PropertySymbol.Name};";
+                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = PrimaryIdMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? Guid.Empty;";
             }
             return new Mappings(toModel, toEntity);
         }
@@ -327,22 +327,22 @@ namespace DynamicsMapper
                 targetType = typeSymbol.TypeArguments.First() as INamedTypeSymbol;
 
             var castNeeded = targetType!.Name != typeof(int).Name;
-            var modelAsInt = castNeeded ? $"(int){modelName}.{attribute.PropertySymbol.Name}" : $"{modelName}.{attribute.PropertySymbol.Name}";
+            var modelAsInt = castNeeded ? $"(int?){modelName}.{attribute.PropertySymbol.Name}" : $"{modelName}.{attribute.PropertySymbol.Name}";
             if (nullable)
             {
-                toEntity = $"entity[\"{attribute.SchemaName}\"] = {modelName}.{attribute.PropertySymbol.Name}.HasValue ? new OptionSetValue({modelAsInt}.Value) : null;";
+                toEntity = $"entity[\"{attribute.SchemaName}\"] = OptionsetMapper.MapToEntity({modelAsInt});";
                 if (castNeeded)
-                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = ({typeSymbol.ToDisplayString()})(entity.GetAttributeValue<OptionSetValue>(\"{attribute.SchemaName}\")?.Value);";
+                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = ({typeSymbol.ToDisplayString()})OptionsetMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
                 else
-                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<OptionSetValue>(\"{attribute.SchemaName}\")?.Value;";
+                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = OptionsetMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
             }
             else
             {
-                toEntity = $"entity[\"{attribute.SchemaName}\"] = new OptionSetValue({modelAsInt});";
+                toEntity = $"entity[\"{attribute.SchemaName}\"] = OptionsetMapper.MapToEntity({modelAsInt});";
                 if (castNeeded)
-                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = ({typeSymbol.ToDisplayString()})(entity.GetAttributeValue<OptionSetValue>(\"{attribute.SchemaName}\")?.Value ?? 0);";
+                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = ({typeSymbol.ToDisplayString()})(OptionsetMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? 0);";
                 else
-                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<OptionSetValue>(\"{attribute.SchemaName}\")?.Value ?? 0;";
+                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = OptionsetMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? 0;";
             }
             return new Mappings(toModel, toEntity);
         }
@@ -373,19 +373,24 @@ namespace DynamicsMapper
             var elementCastString = elementCastNeeded ? "(int)" : string.Empty;
             if (nullable)
             {
-                toEntity = $"entity[\"{attribute.SchemaName}\"] = {modelName}.{attribute.PropertySymbol.Name} is null ? null : new OptionSetValueCollection({modelName}.{attribute.PropertySymbol.Name}.Select(e => new OptionSetValue({elementCastString}e)).ToList());";
                 if (elementCastNeeded)
-                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<OptionSetValueCollection>(\"{attribute.SchemaName}\")?.Select(e => e.Value).Cast<{elementTypeSymbol.ToDisplayString()}>().ToArray();";
+                {
+                    toEntity = $"entity[\"{attribute.SchemaName}\"] = OptionSetValueCollectionMapper.MapToEntity<{elementTypeSymbol.ToDisplayString()}>({modelName}.{attribute.PropertySymbol.Name});";
+                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = OptionSetValueCollectionMapper.MapToModel<{elementTypeSymbol.ToDisplayString()}>(entity, \"{attribute.SchemaName}\");";
+                }
                 else
-                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<OptionSetValueCollection>(\"{attribute.SchemaName}\")?.Select(e => e.Value).ToArray();";
+                {
+                    toEntity = $"entity[\"{attribute.SchemaName}\"] = OptionSetValueCollectionMapper.MapToEntity({elementCastString}{modelName}.{attribute.PropertySymbol.Name});";
+                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = OptionSetValueCollectionMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
+                }
             }
             else
             {
-                toEntity = $"entity[\"{attribute.SchemaName}\"] = new OptionSetValueCollection({modelName}.{attribute.PropertySymbol.Name}.Select(e => new OptionSetValue({elementCastString}e)).ToList());";
+                toEntity = $"entity[\"{attribute.SchemaName}\"] = OptionSetValueCollectionMapper.MapToEntity({modelName}.{attribute.PropertySymbol.Name});";
                 if (elementCastNeeded)
-                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<OptionSetValueCollection>(\"{attribute.SchemaName}\")?.Select(e => e.Value).Cast<{elementTypeSymbol.ToDisplayString()}>().ToArray() ?? Array.Empty<{elementTypeSymbol.ToDisplayString()}>();";
+                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = OptionSetValueCollectionMapper.MapToModel<{elementTypeSymbol.ToDisplayString()}>(entity, \"{attribute.SchemaName}\") ?? Array.Empty<{elementTypeSymbol.ToDisplayString()}>();";
                 else
-                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<OptionSetValueCollection>(\"{attribute.SchemaName}\")?.Select(e => e.Value).ToArray() ?? Array.Empty<{elementTypeSymbol.ToDisplayString()}>();";
+                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = OptionSetValueCollectionMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
             }
             return new Mappings(toModel, toEntity);
         }
@@ -399,13 +404,17 @@ namespace DynamicsMapper
                 attribute.PropertySymbol.SetInvalidTypeDiagnostic(ctx, typeSymbol, MappingType.Formatted, allowedTypes);
                 return null;
             }
-
-            var codeWriter = new CodeWriter();
-            using (codeWriter.BeginScope($"if (entity.FormattedValues.TryGetValue(\"{attribute.SchemaName}\", out var formatted{attribute.PropertySymbol.Name}))"))
+            var nullable = attribute.PropertySymbol.NullableAnnotation == NullableAnnotation.Annotated;
+            string toModel;
+            if (nullable)
             {
-                codeWriter.AppendLine($"{modelName}.{attribute.PropertySymbol.Name} = formatted{attribute.PropertySymbol.Name};");
+                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = FormettedValuesMapper.MapToModel(entity,\"{attribute.SchemaName}\");";
             }
-            return new Mappings(codeWriter.ToString(), string.Empty);
+            else
+            {
+                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = FormettedValuesMapper.MapToModel(entity,\"{attribute.SchemaName}\") ?? string.Empty;";
+            }
+            return new Mappings(toModel, string.Empty);
         }
 
         private static Mappings? GenerateMoneyMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
@@ -421,13 +430,13 @@ namespace DynamicsMapper
             string toEntity;
             if (attribute.PropertySymbol.NullableAnnotation == NullableAnnotation.Annotated)
             {
-                toEntity = $"entity[\"{attribute.SchemaName}\"] = {modelName}.{attribute.PropertySymbol.Name}.HasValue ? new Money({modelName}.{attribute.PropertySymbol.Name}.Value) : null;";
-                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<Money>(\"{attribute.SchemaName}\")?.Value;";
+                toEntity = $"entity[\"{attribute.SchemaName}\"] = MoneyMapper.MapToEntity({modelName}.{attribute.PropertySymbol.Name});";
+                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = MoneyMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
             }
             else
             {
-                toEntity = $"entity[\"{attribute.SchemaName}\"] = new Money({attribute.PropertySymbol.Name});";
-                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<Money>(\"{attribute.SchemaName}\")?.Value ?? 0m;";
+                toEntity = $"entity[\"{attribute.SchemaName}\"] = MoneyMapper.MapToEntity({modelName}.{attribute.PropertySymbol.Name});";
+                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = MoneyMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? 0m;";
             }
             return new Mappings(toModel, toEntity);
         }
@@ -445,13 +454,13 @@ namespace DynamicsMapper
             string toEntity;
             if (attribute.PropertySymbol.NullableAnnotation == NullableAnnotation.Annotated)
             {
-                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<EntityReference>(\"{attribute.SchemaName}\")?.Id;";
-                toEntity = $"entity[\"{attribute.SchemaName}\"] = {modelName}.{attribute.PropertySymbol.Name}.HasValue ? new EntityReference(\"{attribute.Target}\", {modelName}.{attribute.PropertySymbol.Name}.Value) : null;";
+                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = LookupMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
+                toEntity = $"entity[\"{attribute.SchemaName}\"] = LookupMapper.MapToEntity({modelName}.{attribute.PropertySymbol.Name},\"{attribute.Target}\");";
             }
             else
             {
-                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<EntityReference>(\"{attribute.SchemaName}\")?.Id ?? Guid.Empty;";
-                toEntity = $"entity[\"{attribute.SchemaName}\"] = new EntityReference(\"{attribute.Target}\", {modelName}.{attribute.PropertySymbol.Name});";
+                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = LookupMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? Guid.Empty;";
+                toEntity = $"entity[\"{attribute.SchemaName}\"] = LookupMapper.MapToEntity({modelName}.{attribute.PropertySymbol.Name},\"{attribute.Target}\");";
             }
             return new Mappings(toModel, toEntity);
         }
@@ -466,8 +475,8 @@ namespace DynamicsMapper
             }
             //var toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<{attribute.PropertySymbol.Type}>(\"{attribute.SchemaName}\");";
             //var toEntity = $"entity[\"{attribute.SchemaName}\"] = {modelName}.{attribute.PropertySymbol.Name};";
-            var toModel = $"{modelName}.{attribute.PropertySymbol.Name} = PropertyMapper.MapToModel<{attribute.PropertySymbol.Type}, {attribute.PropertySymbol.Type}>(entity,\"{attribute.SchemaName}\");";
-            var toEntity = $"entity[\"{attribute.SchemaName}\"] = PropertyMapper.MapToEntity<{attribute.PropertySymbol.Type}, {attribute.PropertySymbol.Type}>({modelName}.{attribute.PropertySymbol.Name});";
+            var toModel = $"{modelName}.{attribute.PropertySymbol.Name} = BasicMapper.MapToModel<{attribute.PropertySymbol.Type}>(entity, \"{attribute.SchemaName}\");";
+            var toEntity = $"entity[\"{attribute.SchemaName}\"] = BasicMapper.MapToEntity<{attribute.PropertySymbol.Type}>({modelName}.{attribute.PropertySymbol.Name});";
             return new Mappings(toModel, toEntity);
         }
 

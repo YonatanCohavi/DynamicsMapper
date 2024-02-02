@@ -1,7 +1,8 @@
 ﻿using DebuggerClient.Enums;
 using DynamicsMapper.Abstractions;
+using Tests.Enums;
 
-namespace DebuggerClient.Models
+namespace Tests.Entities
 {
     [CrmEntity("contact")]
     public class Contact
@@ -9,13 +10,13 @@ namespace DebuggerClient.Models
         const string AccountAlias = "account";
         [CrmField("contactid", Mapping = MappingType.PrimaryId)]
         public Guid? ContactId { get; set; }
-        [CrmField("rtm_o_test", Mapping = MappingType.MultipleOptions)]
-        public int[]? Tests { get; set; }
-        [CrmField("rtm_o_test2", Mapping = MappingType.MultipleOptions)]
-        public ContactType[]? Tests2 { get; set; }
+        [CrmField("rtm_mo_fav_colors", Mapping = MappingType.MultipleOptions)]
+        public Color[]? FavoriteColors { get; set; }
+        [CrmField("rtm_mo_fav_colors_int", Mapping = MappingType.MultipleOptions)]
+        public int[]? FavoriteColorsInt { get; set; }
         [CrmField("rtm_o_type", Mapping = MappingType.Options)]
         public ContactType? ContactType { get; set; }
-        [CrmField("rtm_o_type2", Mapping = MappingType.Options)]
+        [CrmField("rtm_o_type_int", Mapping = MappingType.Options)]
         public int? IntContantType { get; set; }
         [CrmField("rtm_s_firstname")]
         public string? Firstname { get; set; }
@@ -27,7 +28,7 @@ namespace DebuggerClient.Models
         public DateTime? Birthdate { get; set; }
         [CrmField("rtm_i_age")]
         public int? Age { get; set; }
-        [CrmField("sal", Mapping = MappingType.Money)]
+        [CrmField("new_sallery", Mapping = MappingType.Money)]
         public decimal? Sallery { get; set; }
         [CrmField("rtm_l_account", Target = "account")]
         public Guid? AccountId { get; set; }
