@@ -33,7 +33,7 @@ namespace DynamicsMapper
             if (mappers.IsDefaultOrEmpty)
                 return;
             GenerateEntityExtentionClass(ctx);
-            GenerateIEntityMapper(ctx);
+            //GenerateIEntityMapper(ctx);
             var crmLinkAttributeSymbol = compilation.GetTypeByMetadataName(typeof(CrmLinkAttribute).FullName);
             var crmEntityAttributeSymbol = compilation.GetTypeByMetadataName(typeof(CrmEntityAttribute).FullName);
             var crmFieldAttributeSymbol = compilation.GetTypeByMetadataName(typeof(CrmFieldAttribute).FullName);
@@ -173,7 +173,9 @@ namespace DynamicsMapper
             writer.AddUsing("Microsoft.Xrm.Sdk");
             writer.AddUsing("Microsoft.Xrm.Sdk.Query");
             writer.AddUsing("DynamicsMapper.Extension");
-            writer.AddUsing("DynamicsMapper.Mappers");
+            writer.AddUsing("DynamicsMapper.Abstractions.Mappers");
+            writer.AddUsing("DynamicsMapper.Abstractions");
+            //writer.AddUsing("DynamicsMapper.Mappers");
             writer.AddUsing("System");
             writer.AppendLine();
             var className = mapperSyntax.Identifier.ValueText;
@@ -462,8 +464,10 @@ namespace DynamicsMapper
                 attribute.PropertySymbol.SetInvalidTypeDiagnostic(ctx, typeSymbol, MappingType.Basic, allowedTypes);
                 return null;
             }
-            var toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<{attribute.PropertySymbol.Type}>(\"{attribute.SchemaName}\");";
-            var toEntity = $"entity[\"{attribute.SchemaName}\"] = {modelName}.{attribute.PropertySymbol.Name};";
+            //var toModel = $"{modelName}.{attribute.PropertySymbol.Name} = entity.GetAttributeValue<{attribute.PropertySymbol.Type}>(\"{attribute.SchemaName}\");";
+            //var toEntity = $"entity[\"{attribute.SchemaName}\"] = {modelName}.{attribute.PropertySymbol.Name};";
+            var toModel = $"{modelName}.{attribute.PropertySymbol.Name} = PropertyMapper.MapToModel<{attribute.PropertySymbol.Type}, {attribute.PropertySymbol.Type}>(entity,\"{attribute.SchemaName}\");";
+            var toEntity = $"entity[\"{attribute.SchemaName}\"] = PropertyMapper.MapToEntity<{attribute.PropertySymbol.Type}, {attribute.PropertySymbol.Type}>({modelName}.{attribute.PropertySymbol.Name});";
             return new Mappings(toModel, toEntity);
         }
 
@@ -515,7 +519,7 @@ namespace DynamicsMapper
                 MappingType.Formatted => new[] { typeof(string) },
                 MappingType.Options => new[] { typeof(int) },
                 MappingType.PrimaryId => new[] { typeof(Guid) },
-                MappingType.MultipleOptions => Array.Empty<Type>(),
+                MappingType.MultipleOptions => [],
                 _ => throw new Exception($"Unknown mapping type: {mappingType}"),
             };
         }
