@@ -8,10 +8,13 @@ namespace DynamicsMapper.Abstractions.Mappers
         EntityReference? MapToEntity(Guid? id, string target);
         Guid? MapToModel(Entity entity, string attribute);
     }
-    public static class LookupMapper
+    public class LookupMapper : ILookupMapper
     {
-        public static EntityReference? MapToEntity(Guid? id, string target) => id.HasValue ? new EntityReference(target, id.Value) : null;
-        public static Guid? MapToModel(Entity entity, string attribute) => entity.GetAttributeValue<EntityReference>(attribute)?.Id;
+        private static LookupMapper? _mapper;
+        public static LookupMapper Instance => _mapper ??= new LookupMapper();
+        private LookupMapper() { }
+        public EntityReference? MapToEntity(Guid? id, string target) => id.HasValue ? new EntityReference(target, id.Value) : null;
+        public Guid? MapToModel(Entity entity, string attribute) => entity.GetAttributeValue<EntityReference>(attribute)?.Id;
 
     }
 }

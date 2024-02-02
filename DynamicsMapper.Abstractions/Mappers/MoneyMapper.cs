@@ -2,9 +2,18 @@
 
 namespace DynamicsMapper.Abstractions.Mappers
 {
-    public static class MoneyMapper
+    public class MoneyMapper : IMoneyMapper
     {
-        public static Money? MapToEntity(decimal? value) => value.HasValue ? new Money(value.Value) : null;
-        public static decimal? MapToModel(Entity entity, string attribute) => entity.GetAttributeValue<Money>(attribute)?.Value;
+        private static MoneyMapper? _mapper;
+        public static MoneyMapper Instance => _mapper ??= new MoneyMapper();
+        private MoneyMapper() { }
+        public Money? MapToEntity(decimal? value) => value.HasValue ? new Money(value.Value) : null;
+        public decimal? MapToModel(Entity entity, string attribute) => entity.GetAttributeValue<Money>(attribute)?.Value;
+    }
+
+    public interface IMoneyMapper
+    {
+        Money? MapToEntity(decimal? value);
+        decimal? MapToModel(Entity entity, string attribute);
     }
 }
