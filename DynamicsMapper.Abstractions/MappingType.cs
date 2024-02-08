@@ -10,5 +10,7 @@
         MultipleOptions = 6,
         PrimaryId = 7,
         Link = 8,
+        DynamicLookup = 9,
+        DynamicLookupTarget = 10,
     }
 }

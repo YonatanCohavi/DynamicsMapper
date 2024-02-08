@@ -1,54 +1,25 @@
-﻿using DynamicsMapper.Abstractions;
-using DynamicsMapper.Extension;
-using Microsoft.Xrm.Sdk;
-using Microsoft.Xrm.Sdk.Query;
-
-namespace DebuggerClient.Models
+﻿namespace DebuggerClient.Models
 {
-    public class AccountMapper2 : IEntityMapper<Account>
-    {
-        private static readonly string[] columns = new[]
-        {
-            "accountid"
-        };
-        public ColumnSet Columns => new ColumnSet(columns);
+    //internal class DemoMapper : IEntityMapper<Contact>
+    //{
+    //    private IPropertyMappers mappers => DynamicsMapperSettings.Default.Mappers;
+    //    public string Entityname => throw new NotImplementedException();
 
-        private const string entityname = "account";
-        public string Entityname => entityname;
+    //    public ColumnSet Columns => throw new NotImplementedException();
 
-        public Entity Map(Account account)
-        {
-            var entity = new Entity(entityname);
-            entity.Id = account.AccountId;
-            return entity;
-        }
+    //    public Contact Map(Entity entity, Dictionary<string, string>? dynamicMappingsTargets)
+    //    {
+    //        throw new NotImplementedException();
+    //    }
 
-        public Account? Map(Entity entity, string alias) => InternalMap(entity, alias);
-        public Account Map(Entity entity) => InternalMap(entity)!;
-        private static Account? InternalMap(Entity source, string? alias = null)
-        {
-            Entity? entity;
+    //    public Contact? Map(Entity entity, string alias, Dictionary<string, string>? dynamicMappingsTargets)
+    //    {
+    //        throw new NotImplementedException();
+    //    }
 
-            if (string.IsNullOrEmpty(alias))
-            {
-                entity = source;
-            }
-            else
-            {
-                entity = source.GetAliasedEntity(alias);
-                if (entity is null)
-                    return null;
-            }
-
-            if (entity?.LogicalName != entityname)
-                throw new ArgumentException($"entity LogicalName expected to be {entityname} recived: {entity?.LogicalName}", nameof(source));
-            var account = new Account();
-            account.AccountId = entity.GetAttributeValue<Guid>("accountid");
-            var contactMapper = new DebuggerClient.Models.ContactMapper();
-            var mapped_contact = contactMapper.Map(source, "contact");
-            if (mapped_contact != null)
-                account.Contact = mapped_contact;
-            return account;
-        }
-    }
+    //    public Entity Map(Contact model)
+    //    {
+    //        throw new NotImplementedException();
+    //    }
 }
+

@@ -9,8 +9,8 @@ namespace DynamicsMapper.Abstractions
         string Entityname { get; }
         ColumnSet Columns { get; }
 
-        T Map(Entity entity);
-        T? Map(Entity entity, string alias);
-        Entity Map(T model);
+        T Map(Entity entity, DynamicsMappingsTargets? dynamicMappingsTargets);
+        T? Map(Entity entity, string alias, DynamicsMappingsTargets? dynamicMappingsTargets);
+        Entity Map(T model, DynamicsMappingsTargets? dynamicMappingsTargets);
     }
 }

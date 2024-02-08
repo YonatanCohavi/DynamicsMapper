@@ -6,7 +6,7 @@ namespace DynamicsMapper.Abstractions
     public class CrmEntityAttribute : Attribute
     {
         public string LogicalName { get; set; }
-        public string MapperName { get; set; }
+        public string? MapperName { get; set; }
         public CrmEntityAttribute(string logicalname)
         {
             LogicalName = logicalname;

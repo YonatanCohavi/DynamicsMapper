@@ -1,4 +1,5 @@
 using DebuggerClient.Enums;
+using DebuggerClient.Models;
 using Microsoft.Xrm.Sdk;
 using Tests.Entities;
 using Tests.Enums;
@@ -60,6 +61,53 @@ namespace Tests
             Assert.AreEqual(1500, entity.GetAttributeValue<Money>("new_sallery").Value);
             CollectionAssert.AreEqual(_colors, entity.GetAttributeValue<OptionSetValueCollection>("rtm_mo_fav_colors").Select(v => (Color)v.Value).ToArray());
             CollectionAssert.AreEqual(_colorsInt, entity.GetAttributeValue<OptionSetValueCollection>("rtm_mo_fav_colors_int").Select(v => v.Value).ToArray());
+        }
+        [TestMethod]
+        public void DynamicMappingsToEntity()
+        {
+            var emailId = Guid.NewGuid();
+            var regardingId = Guid.NewGuid();
+            var email = new Email
+            {
+                Regarding = regardingId,
+                Id = emailId,
+                Subject = "email subject"
+            };
+            var mapper = new EmailMapper();
+            var targets = new EmailTargets
+            {
+                Regarding = "account",
+                OwnerId = "team",
+            };
+            var entity = mapper.Map(email, targets);
+            var regardingRef = entity.GetAttributeValue<EntityReference>("regardingobjectid");
+            var ownerRef = entity.GetAttributeValue<EntityReference>("ownerid");
+            Assert.AreEqual("account", regardingRef.LogicalName);
+            Assert.AreEqual(regardingId, regardingRef.Id);
+            Assert.IsNull(ownerRef);
+
+        }
+        [TestMethod]
+        public void DynamicMappingsToModel()
+        {
+            var emailId = Guid.NewGuid();
+            var regardingId = Guid.NewGuid();
+            var entity = new Entity("email", emailId)
+            {
+                ["regardingobjectid"] = new EntityReference("account", regardingId),
+                ["subject"] = "email subject"
+            };
+
+            var mapper = new EmailMapper();
+            var targets = new EmailTargets
+            {
+                Regarding = "account",
+                OwnerId = "team",
+            };
+            var email = mapper.Map(entity, targets);
+            Assert.AreEqual("account", email.RegardingTarget);
+            Assert.AreEqual(regardingId, email.Regarding);
+            Assert.IsNull(email.OwnerId);
         }
         [TestMethod]
         public void EntityToModel()
