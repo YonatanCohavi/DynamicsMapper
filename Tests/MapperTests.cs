@@ -1,5 +1,6 @@
 using DebuggerClient.Enums;
 using DebuggerClient.Models;
+using DynamicsMapper.Abstractions;
 using Microsoft.Xrm.Sdk;
 using Tests.Entities;
 using Tests.Enums;
@@ -19,6 +20,7 @@ namespace Tests
         {
             ContactId = _contactId,
             Firstname = "john",
+            Lastname = null,
             Age = 15,
             Birthdate = new DateTime(2020, 1, 1),
             ContactType = ContactType.Member,
@@ -42,10 +44,10 @@ namespace Tests
             ["rtm_mo_fav_colors"] = new OptionSetValueCollection(_colors.Select(c => new OptionSetValue((int)c)).ToList()),
             ["rtm_mo_fav_colors_int"] = new OptionSetValueCollection(_colorsInt.Select(c => new OptionSetValue(c)).ToList()),
         };
-        private static Entity MapModel()
+        private static Entity MapModel(DynamicsMapperSettings settings)
         {
             var mapper = new ContactMapper();
-            var entity = mapper.Map(_sourceModel);
+            var entity = mapper.Map(_sourceModel, settings: settings);
             return entity;
 
         }
@@ -99,12 +101,7 @@ namespace Tests
             };
 
             var mapper = new EmailMapper();
-            var targets = new EmailTargets
-            {
-                Regarding = "account",
-                OwnerId = "team",
-            };
-            var email = mapper.Map(entity, targets);
+            var email = mapper.Map(entity);
             Assert.AreEqual("account", email.RegardingTarget);
             Assert.AreEqual(regardingId, email.Regarding);
             Assert.IsNull(email.OwnerId);
@@ -131,20 +128,20 @@ namespace Tests
         [TestMethod]
         public void ModelToEntity()
         {
-            var entity = MapModel();
+            var entity = MapModel(DynamicsMapperSettings.Default);
             ModelToEntityAsserts(entity);
         }
 
-        //[TestMethod]
-        //public void ModelToEntitySkipDefault()
-        //{
-        //    var settings = new MapperSettings
-        //    {
-        //        SkipDefaultValues = true
-        //    };
-        //    var entity = MapModel(settings);
-        //    ModelToEntityAsserts(entity);
-        //    Assert.AreEqual(8, entity.Attributes.Count);
-        //}
+        [TestMethod]
+        public void ModelToEntitySkipDefault()
+        {
+            var settings = new DynamicsMapperSettings
+            {
+                NullHandling = DynamicsMapper.Abstractions.Settings.NullHandling.Skip
+            };
+            var entity = MapModel(settings);
+            ModelToEntityAsserts(entity);
+            Assert.AreEqual(9, entity.Attributes.Count);
+        }
     }
 }

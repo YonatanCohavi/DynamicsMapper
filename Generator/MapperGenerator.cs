@@ -138,8 +138,8 @@ namespace DynamicsMapper
         {
             var columns = generationDetails.Where(a => !string.IsNullOrEmpty(a.SchemaName)).Select(a => $"\"{a.SchemaName}\"").Distinct().ToList();
             var @namespace = mapperSyntax.GetParent<BaseNamespaceDeclarationSyntax>()!.Name.ToString();
-            var toEntityContent = new List<string>();
-            var toModelContent = new List<string>();
+            var toEntityContent = new StringBuilder();
+            var toModelContent = new StringBuilder();
             var className = mapperSyntax.Identifier.ValueText;
             var modelName = $"{char.ToLower(className[0])}{className.Substring(1)}";
 
@@ -152,9 +152,18 @@ namespace DynamicsMapper
                 if (!attMappings.HasValue)
                     continue;
 
-                toEntityContent.Add(attMappings.Value.ToEntity);
+                if (!string.IsNullOrEmpty(attMappings.Value.ToEntity))
+                {
+                    toEntityContent.AppendLine($"if(settings.NullHandling != NullHandling.Skip || {attMappings.Value.AttributRef} != default({attMappings.Value.AttributeType}))");
+                    toEntityContent.AppendLine("{");
+                    toEntityContent.AppendLine(attMappings.Value.ToEntity);
+                    toEntityContent.AppendLine("}");
+                }
+
                 if (hasSetter)
-                    toModelContent.Add(attMappings.Value.ToModel);
+                {
+                    toModelContent.AppendLine(attMappings.Value.ToModel);
+                }
                 mappings.Add(attMappings.Value);
             }
             var targetClassName = string.Empty;
@@ -170,7 +179,7 @@ namespace DynamicsMapper
             writer.AddUsing("Microsoft.Xrm.Sdk");
             writer.AddUsing("Microsoft.Xrm.Sdk.Query");
             writer.AddUsing("DynamicsMapper.Extension");
-            writer.AddUsing("DynamicsMapper.Abstractions.Mappers");
+            writer.AddUsing("DynamicsMapper.Abstractions.Settings");
             writer.AddUsing("DynamicsMapper.Abstractions");
             //writer.AddUsing("DynamicsMapper.Mappers");
             writer.AddUsing("System");
@@ -185,7 +194,6 @@ namespace DynamicsMapper
                 {
                     writer.AppendLine($"private static readonly string[] columns = new[] {{{string.Join(", ", columns)}}};");
                     writer.AppendLine($"public ColumnSet Columns => new ColumnSet(columns);");
-                    writer.AppendLine($"private IPropertyMappers mappers => DynamicsMapperSettings.Default.Mappers;");
                     writer.AppendLine($"private const string entityname = \"{entityName}\";");
                     writer.AppendLine($"public string Entityname => entityname;");
                     writer.AppendLine();
@@ -205,25 +213,29 @@ namespace DynamicsMapper
                     }
 
                     writer.AppendLine(dynamicTargetsSummary);
-                    using (writer.BeginScope($"public Entity Map({className} {modelName}, {dynamicsMapperTargets})"))
+                    using (writer.BeginScope($"public Entity Map({className} {modelName}, {dynamicsMapperTargets}, DynamicsMapperSettings? settings = null)"))
                     {
+                        writer.AppendLine("settings ??= DynamicsMapperSettings.Default;");
+                        writer.AppendLine("var mappers = settings.Mappers;");
+
                         writer.AppendLine($"var entity = new Entity(entityname);");
-                        toEntityContent.ForEach(writer.AppendLine);
+                        writer.AppendLine(toEntityContent.ToString());
                         writer.AppendLine("return entity;");
                     }
 
                     writer.AppendLine(dynamicTargetsSummary);
-                    writer.AppendLine($"public {className}? Map(Entity entity, string alias, {dynamicsMapperTargets}) => InternalMap(entity, alias);");
+                    writer.AppendLine($"public {className}? Map(Entity entity, string alias, DynamicsMapperSettings? settings = null) => InternalMap(entity, settings, alias);");
 
                     writer.AppendLine(dynamicTargetsSummary);
-                    using (writer.BeginScope($"public {className} Map(Entity entity, {dynamicsMapperTargets})"))
+                    using (writer.BeginScope($"public {className} Map(Entity entity, DynamicsMapperSettings? settings = null)"))
                     {
-                        writer.AppendLine($"var {modelName} = InternalMap(entity) ?? throw new Exception(\"Mapping failed\");");
+                        writer.AppendLine($"var {modelName} = InternalMap(entity, settings) ?? throw new Exception(\"Mapping failed\");");
                         writer.AppendLine($"return {modelName};");
                     }
 
-                    using (writer.BeginScope($"private {className}? InternalMap(Entity source, string? alias = null, DynamicsMappingsTargets? dynamicMappingsTargets = null)"))
+                    using (writer.BeginScope($"private {className}? InternalMap(Entity source, DynamicsMapperSettings? settings, string? alias = null)"))
                     {
+                        writer.AppendLine("var mappers = settings?.Mappers ?? DynamicsMapperSettings.Default.Mappers;");
                         writer.AppendLine($"Entity? entity;");
                         using (writer.BeginScope($"if (string.IsNullOrEmpty(alias))"))
                         {
@@ -237,7 +249,7 @@ namespace DynamicsMapper
                         writer.AppendLine($"if (entity?.LogicalName != entityname)");
                         writer.AppendLine($"throw new ArgumentException($\"entity LogicalName expected to be {{entityname}} recived: {{entity?.LogicalName}}\",\"entity\");");
                         writer.AppendLine($"var {modelName} = new {className}();");
-                        toModelContent.ForEach(writer.AppendLine);
+                        writer.AppendLine(toModelContent.ToString());
                         writer.AppendLine($"return {modelName};");
                     }
                 }
@@ -291,7 +303,7 @@ namespace DynamicsMapper
                 MappingType.DynamicLookup => GenerateDynamicLookupMappings(modelName, attribute, ctx),
                 MappingType.DynamicLookupTarget => GenerateDynamicLookupTargetMappings(modelName, attribute, ctx),
                 _ => throw new Exception($"{attribute.Mapping} is not defined"),
-            }; ;
+            };
         }
 
         private static Mappings? GenerateDynamicLookupMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
@@ -307,20 +319,23 @@ namespace DynamicsMapper
             var toEntity = new StringBuilder();
             var target = attribute.Target;
 
+            var attributeType = attribute.PropertySymbol.Type.ToString();
+            var attributeRef = $"{modelName}.{attribute.PropertySymbol.Name}";
+
 
             toEntity.AppendLine($"if (dynamicMappingsTargets?.TryGetValue(\"{attribute.SchemaName}\",out var {attribute.SchemaName}_target) != true || string.IsNullOrEmpty({attribute.SchemaName}_target))");
             toEntity.AppendLine($"throw new ArgumentException(\"target not found for '{attribute.SchemaName}'\",nameof(dynamicMappingsTargets));");
             if (attribute.PropertySymbol.NullableAnnotation == NullableAnnotation.Annotated)
             {
-                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = mappers.LookupMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
-                toEntity.AppendLine($"entity[\"{attribute.SchemaName}\"] = mappers.LookupMapper.MapToEntity({modelName}.{attribute.PropertySymbol.Name},{attribute.SchemaName}_target);");
+                toModel = $"{attributeRef} = mappers.LookupMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
+                toEntity.AppendLine($"entity[\"{attribute.SchemaName}\"] = mappers.LookupMapper.MapToEntity({attributeRef},{attribute.SchemaName}_target);");
             }
             else
             {
-                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = mappers.LookupMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? Guid.Empty;";
-                toEntity.AppendLine($"entity[\"{attribute.SchemaName}\"] = mappers.LookupMapper.MapToEntity({modelName}.{attribute.PropertySymbol.Name},{attribute.SchemaName}_target);");
+                toModel = $"{attributeRef} = mappers.LookupMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? Guid.Empty;";
+                toEntity.AppendLine($"entity[\"{attribute.SchemaName}\"] = mappers.LookupMapper.MapToEntity({attributeRef},{attribute.SchemaName}_target);");
             }
-            return new Mappings(toModel, toEntity.ToString(), MappingType.DynamicLookup);
+            return new Mappings(toModel, toEntity.ToString(), attributeType, attributeRef, MappingType.DynamicLookup);
         }
 
         private static Mappings? GenerateDynamicLookupTargetMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
@@ -332,17 +347,20 @@ namespace DynamicsMapper
                 attribute.PropertySymbol.SetInvalidTypeDiagnostic(ctx, typeSymbol, MappingType.DynamicLookupTarget, allowedTypes);
                 return null;
             }
+            var attributeType = attribute.PropertySymbol.Type.ToString();
+            var attributeRef = $"{modelName}.{attribute.PropertySymbol.Name}";
+
             var nullable = attribute.PropertySymbol.NullableAnnotation == NullableAnnotation.Annotated;
             string toModel;
             if (nullable)
             {
-                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = mappers.DynamicLookupTargetMapper.MapToModel(entity,\"{attribute.SchemaName}\");";
+                toModel = $"{attributeRef} = mappers.DynamicLookupTargetMapper.MapToModel(entity,\"{attribute.SchemaName}\");";
             }
             else
             {
-                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = mappers.DynamicLookupTargetMapper.MapToModel(entity,\"{attribute.SchemaName}\") ?? string.Empty;";
+                toModel = $"{attributeRef} = mappers.DynamicLookupTargetMapper.MapToModel(entity,\"{attribute.SchemaName}\") ?? string.Empty;";
             }
-            return new Mappings(toModel, string.Empty, MappingType.DynamicLookupTarget);
+            return new Mappings(toModel, string.Empty, attributeType, attributeRef, MappingType.DynamicLookupTarget);
         }
 
         private static Mappings? GenerateLinkMappings(string modelName, FieldGenerationDetails attribute, ICollection<MapperDetails> createdMappers, SourceProductionContext ctx)
@@ -361,6 +379,9 @@ namespace DynamicsMapper
                 return null;
 
             }
+            var attributeType = attribute.PropertySymbol.Type.ToString();
+            var attributeRef = $"{modelName}.{attribute.PropertySymbol.Name}";
+
             var linkDetails = foundLinkDetails.Single();
 
             string toModel;
@@ -373,7 +394,7 @@ namespace DynamicsMapper
             cw.AppendLine($"if (mapped_{linkDetails.EntityName} != null)");
             cw.AppendLine($"{modelName}.{attribute.PropertySymbol.Name} = mapped_{linkDetails.EntityName};");
             toModel = cw.ToString();
-            return new Mappings(toModel, string.Empty, MappingType.Link);
+            return new Mappings(toModel, string.Empty, string.Empty, attributeRef, MappingType.Link);
         }
 
         private static Mappings? GeneratePrimaryIdMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
@@ -387,16 +408,19 @@ namespace DynamicsMapper
                 return null;
             }
             string toModel;
-            var toEntity = $"entity.Id = mappers.PrimaryIdMapper.MapToEntity({modelName}.{attribute.PropertySymbol.Name}) ?? Guid.Empty;";
+            var attributeType = attribute.PropertySymbol.Type.ToString();
+            var attributeRef = $"{modelName}.{attribute.PropertySymbol.Name}";
+
+            var toEntity = $"entity.Id = mappers.PrimaryIdMapper.MapToEntity({attributeRef}) ?? Guid.Empty;";
             if (nullable)
             {
-                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = mappers.PrimaryIdMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
+                toModel = $"{attributeRef} = mappers.PrimaryIdMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
             }
             else
             {
-                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = mappers.PrimaryIdMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? Guid.Empty;";
+                toModel = $"{attributeRef} = mappers.PrimaryIdMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? Guid.Empty;";
             }
-            return new Mappings(toModel, toEntity, MappingType.PrimaryId);
+            return new Mappings(toModel, toEntity, attributeType, attributeRef, MappingType.PrimaryId);
         }
 
         private static Mappings? GenerateOptionsMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
@@ -418,23 +442,27 @@ namespace DynamicsMapper
 
             var castNeeded = targetType!.Name != typeof(int).Name;
             var modelAsInt = castNeeded ? $"(int?){modelName}.{attribute.PropertySymbol.Name}" : $"{modelName}.{attribute.PropertySymbol.Name}";
+
+            var attributeType = typeSymbol.ToDisplayString();
+            var attributeRef = $"{modelName}.{attribute.PropertySymbol.Name}";
+
             if (nullable)
             {
                 toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.OptionsetMapper.MapToEntity({modelAsInt});";
                 if (castNeeded)
-                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = ({typeSymbol.ToDisplayString()})mappers.OptionsetMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
+                    toModel = $"{attributeRef} = ({attributeType})mappers.OptionsetMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
                 else
-                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = mappers.OptionsetMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
+                    toModel = $"{attributeRef} = mappers.OptionsetMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
             }
             else
             {
                 toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.OptionsetMapper.MapToEntity({modelAsInt});";
                 if (castNeeded)
-                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = ({typeSymbol.ToDisplayString()})(mappers.OptionsetMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? 0);";
+                    toModel = $"{attributeRef} = ({attributeType})(mappers.OptionsetMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? 0);";
                 else
-                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = mappers.OptionsetMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? 0;";
+                    toModel = $"{attributeRef} = mappers.OptionsetMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? 0;";
             }
-            return new Mappings(toModel, toEntity, MappingType.Options);
+            return new Mappings(toModel, toEntity, attributeType, attributeRef, MappingType.Options);
         }
 
         private static Mappings? GenerateMultipleOptionsMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
@@ -461,28 +489,32 @@ namespace DynamicsMapper
             }
             var elementCastNeeded = elementTypeSymbol!.Name != typeof(int).Name;
             var elementCastString = elementCastNeeded ? "(int)" : string.Empty;
+
+            var attributeType = attribute.PropertySymbol.Type.ToString();
+            var attributeRef = $"{modelName}.{attribute.PropertySymbol.Name}";
+
             if (nullable)
             {
                 if (elementCastNeeded)
                 {
-                    toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.OptionSetValueCollectionMapper.MapToEntity<{elementTypeSymbol.ToDisplayString()}>({modelName}.{attribute.PropertySymbol.Name});";
-                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = mappers.OptionSetValueCollectionMapper.MapToModel<{elementTypeSymbol.ToDisplayString()}>(entity, \"{attribute.SchemaName}\");";
+                    toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.OptionSetValueCollectionMapper.MapToEntity<{elementTypeSymbol.ToDisplayString()}>({attributeRef});";
+                    toModel = $"{attributeRef} = mappers.OptionSetValueCollectionMapper.MapToModel<{elementTypeSymbol.ToDisplayString()}>(entity, \"{attribute.SchemaName}\");";
                 }
                 else
                 {
-                    toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.OptionSetValueCollectionMapper.MapToEntity({elementCastString}{modelName}.{attribute.PropertySymbol.Name});";
-                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = mappers.OptionSetValueCollectionMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
+                    toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.OptionSetValueCollectionMapper.MapToEntity({elementCastString}{attributeRef});";
+                    toModel = $"{attributeRef} = mappers.OptionSetValueCollectionMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
                 }
             }
             else
             {
-                toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.OptionSetValueCollectionMapper.MapToEntity({modelName}.{attribute.PropertySymbol.Name});";
+                toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.OptionSetValueCollectionMapper.MapToEntity({attributeRef});";
                 if (elementCastNeeded)
-                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = mappers.OptionSetValueCollectionMapper.MapToModel<{elementTypeSymbol.ToDisplayString()}>(entity, \"{attribute.SchemaName}\") ?? Array.Empty<{elementTypeSymbol.ToDisplayString()}>();";
+                    toModel = $"{attributeRef} = mappers.OptionSetValueCollectionMapper.MapToModel<{elementTypeSymbol.ToDisplayString()}>(entity, \"{attribute.SchemaName}\") ?? Array.Empty<{elementTypeSymbol.ToDisplayString()}>();";
                 else
-                    toModel = $"{modelName}.{attribute.PropertySymbol.Name} = mappers.OptionSetValueCollectionMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
+                    toModel = $"{attributeRef} = mappers.OptionSetValueCollectionMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
             }
-            return new Mappings(toModel, toEntity, MappingType.MultipleOptions);
+            return new Mappings(toModel, toEntity, attributeType, attributeRef, MappingType.MultipleOptions);
         }
 
         private static Mappings? GenerateFormattedMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
@@ -494,17 +526,20 @@ namespace DynamicsMapper
                 attribute.PropertySymbol.SetInvalidTypeDiagnostic(ctx, typeSymbol, MappingType.Formatted, allowedTypes);
                 return null;
             }
+            var attributeType = attribute.PropertySymbol.Type.ToString();
+            var attributeRef = $"{modelName}.{attribute.PropertySymbol.Name}";
+
             var nullable = attribute.PropertySymbol.NullableAnnotation == NullableAnnotation.Annotated;
             string toModel;
             if (nullable)
             {
-                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = mappers.FormattedValuesMapper.MapToModel(entity,\"{attribute.SchemaName}\");";
+                toModel = $"{attributeRef} = mappers.FormattedValuesMapper.MapToModel(entity,\"{attribute.SchemaName}\");";
             }
             else
             {
-                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = mappers.FormattedValuesMapper.MapToModel(entity,\"{attribute.SchemaName}\") ?? string.Empty;";
+                toModel = $"{attributeRef} = mappers.FormattedValuesMapper.MapToModel(entity,\"{attribute.SchemaName}\") ?? string.Empty;";
             }
-            return new Mappings(toModel, string.Empty, MappingType.Formatted);
+            return new Mappings(toModel, string.Empty, attributeType, attributeRef, MappingType.Formatted);
         }
 
         private static Mappings? GenerateMoneyMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
@@ -518,17 +553,21 @@ namespace DynamicsMapper
             }
             string toModel;
             string toEntity;
+
+            var attributeType = attribute.PropertySymbol.Type.ToString();
+            var attributeRef = $"{modelName}.{attribute.PropertySymbol.Name}";
+
             if (attribute.PropertySymbol.NullableAnnotation == NullableAnnotation.Annotated)
             {
-                toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.MoneyMapper.MapToEntity({modelName}.{attribute.PropertySymbol.Name});";
-                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = mappers.MoneyMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
+                toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.MoneyMapper.MapToEntity({attributeRef});";
+                toModel = $"{attributeRef} = mappers.MoneyMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
             }
             else
             {
-                toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.MoneyMapper.MapToEntity({modelName}.{attribute.PropertySymbol.Name});";
+                toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.MoneyMapper.MapToEntity({attributeRef});";
                 toModel = $"{modelName}.{attribute.PropertySymbol.Name} = mappers.MoneyMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? 0m;";
             }
-            return new Mappings(toModel, toEntity, MappingType.Money);
+            return new Mappings(toModel, toEntity, attributeType, attributeRef, MappingType.Money);
         }
 
         private static Mappings? GenerateLookupMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
@@ -540,32 +579,40 @@ namespace DynamicsMapper
                 attribute.PropertySymbol.SetInvalidTypeDiagnostic(ctx, typeSymbol, MappingType.Lookup, allowedTypes);
                 return null;
             }
+
+            var attributeType = attribute.PropertySymbol.Type.ToString();
+            var attributeRef = $"{modelName}.{attribute.PropertySymbol.Name}";
+
             string toModel;
             string toEntity;
             if (attribute.PropertySymbol.NullableAnnotation == NullableAnnotation.Annotated)
             {
-                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = mappers.LookupMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
-                toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.LookupMapper.MapToEntity({modelName}.{attribute.PropertySymbol.Name},\"{attribute.Target}\");";
+                toModel = $"{attributeRef} = mappers.LookupMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
+                toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.LookupMapper.MapToEntity({attributeRef},\"{attribute.Target}\");";
             }
             else
             {
-                toModel = $"{modelName}.{attribute.PropertySymbol.Name} = mappers.LookupMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? Guid.Empty;";
-                toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.LookupMapper.MapToEntity({modelName}.{attribute.PropertySymbol.Name},\"{attribute.Target}\");";
+                toModel = $"{attributeRef} = mappers.LookupMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? Guid.Empty;";
+                toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.LookupMapper.MapToEntity({attributeRef},\"{attribute.Target}\");";
             }
-            return new Mappings(toModel, toEntity, MappingType.Lookup);
+            return new Mappings(toModel, toEntity, attributeType, attributeRef, MappingType.Lookup);
         }
         private static Mappings? GenerateBasicMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
         {
             var allowedTypes = GetAllowedTypes(MappingType.Basic);
             var typeSymbol = attribute.PropertySymbol.Type.GetUnelyingType().Name;
+
+            var attributeType = attribute.PropertySymbol.Type.ToString();
+            var attributeRef = $"{modelName}.{attribute.PropertySymbol.Name}";
+
             if (!allowedTypes.Any(t => t.Name == typeSymbol))
             {
                 attribute.PropertySymbol.SetInvalidTypeDiagnostic(ctx, typeSymbol, MappingType.Basic, allowedTypes);
                 return null;
             }
-            var toModel = $"{modelName}.{attribute.PropertySymbol.Name} = mappers.BasicMapper.MapToModel<{attribute.PropertySymbol.Type}>(entity, \"{attribute.SchemaName}\");";
-            var toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.BasicMapper.MapToEntity<{attribute.PropertySymbol.Type}>({modelName}.{attribute.PropertySymbol.Name});";
-            return new Mappings(toModel, toEntity, MappingType.Basic);
+            var toModel = $"{attributeRef} = mappers.BasicMapper.MapToModel<{attributeType}>(entity, \"{attribute.SchemaName}\");";
+            var toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.BasicMapper.MapToEntity<{attributeType}>({attributeRef});";
+            return new Mappings(toModel, toEntity, attributeType, attributeRef, MappingType.Basic);
         }
 
         private static IEnumerable<FieldGenerationDetails> ExtractAttributes(IEnumerable<IPropertySymbol> properties, INamedTypeSymbol crmFieldAttributeSymbol, INamedTypeSymbol crmLinkAttributeSymbol, SourceProductionContext ctx)

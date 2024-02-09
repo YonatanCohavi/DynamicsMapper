@@ -12,6 +12,8 @@ namespace DebuggerClient.Models
         public string? Subject { get; set; }
         [CrmField("regardingobjectid", Mapping = MappingType.DynamicLookup)]
         public Guid? Regarding { get; set; }
+        [CrmField("regardingobjectid", Mapping = MappingType.DynamicLookupTarget)]
+        public string? RegardingTarget { get; set; }
 
     }
 }
