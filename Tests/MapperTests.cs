@@ -138,7 +138,7 @@ namespace Tests
         {
             var settings = new DynamicsMapperSettings
             {
-                DefaultValueHandling = DefaultValueHandling.Skip
+                DefaultValueHandling = DefaultValueHandling.Ignore,
             };
             var entity = MapModel(settings);
             ModelToEntityAsserts(entity);

@@ -154,7 +154,7 @@ namespace DynamicsMapper
 
                 if (!string.IsNullOrEmpty(attMappings.Value.ToEntity))
                 {
-                    toEntityContent.AppendLine($"if(settings.DefaultValueHandling != DefaultValueHandling.Skip || {attMappings.Value.AttributRef} != default({attMappings.Value.AttributeType}))");
+                    toEntityContent.AppendLine($"if(settings.DefaultValueHandling != DefaultValueHandling.Ignore || {attMappings.Value.AttributRef} != default({attMappings.Value.AttributeType}))");
                     toEntityContent.AppendLine("{");
                     toEntityContent.AppendLine(attMappings.Value.ToEntity);
                     toEntityContent.AppendLine("}");

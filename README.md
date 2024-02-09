@@ -62,6 +62,8 @@ var person = mapper.Map(entity);
 - `Options`: This mapping type is used for option set fields in the CRM entity. An option set field is a field that allows the user to select from a predefined set of options.
 - `MultipleOptions`: This mapping type is used for multi-select option set fields in the CRM entity. A multi-select option set field is a field that allows the user to select multiple options from a predefined set of options.
 - `PrimaryId`: This mapping type is used for the primary ID field of the CRM entity. The primary ID field is the unique identifier for the entity record.
+- `DynamicLookup`: Similar to Lookup just without a target, for lookups with multiple targets ('customer' / 'regardingobjectid') the target is specified by sending `DynamicsMappingsTargets` to the mapping function.
+- `DynamicLookupTarget`: This mapping type is returnung the target of a dynamic lookup such as 'regardingobjectid'.
 
 ## Define Linked Entities with the CrmLink Attribute
 
@@ -87,3 +89,20 @@ public class Order
 In the example above, the `Order` class has a `Person` property that represents the person associated with the order. The `CrmLink` attribute is used to specify that this property maps to a linked entity in the CRM.
 
 And that's it! You can now use the source generator to generate mapper classes for your entity classes and easily map between your entity classes and the corresponding CRM entities.
+
+## Settings (DynamicsMapperSettings)
+- `DefaultValueHandling`: When this setting is set to 'Ignore', when mapping a model to entity all the default values are ignored.
+- `Mappers`: Let you customize the mapping process by implementing one or more of the mappers.
+
+## Mappers Inetfaces
+- `IBasicMapper`
+- `IFormattedValuesMapper`
+- `IMoneyMapper`
+- `IOptionsetMapper`
+- `IOptionSetValueCollectionMapper`
+- `IPrimaryIdMapper`
+- `ILookupMapper`
+- `IDynamicLookupTargetMapper`
+
+** every mapper interface is used for the equivalent mapping type 
+** the `DynamicLookupTarget` mapping type is using the `ILookupMapper`

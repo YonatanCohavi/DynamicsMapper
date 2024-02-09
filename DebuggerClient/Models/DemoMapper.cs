@@ -42,7 +42,7 @@ namespace DebuggerClient.Models
             var mappers = settings.Mappers;
             var entity = new Entity(entityname);
             entity.Id = mappers.PrimaryIdMapper.MapToEntity(email.Id) ?? Guid.Empty;
-            if (settings.DefaultValueHandling != DefaultValueHandling.Skip && email.Subject != default)
+            if (settings.DefaultValueHandling != DefaultValueHandling.Ignore && email.Subject != default)
                 entity["subject"] = mappers.BasicMapper.MapToEntity<string?>(email.Subject);
             if (dynamicMappingsTargets?.TryGetValue("regardingobjectid", out var regardingobjectid_target) != true || string.IsNullOrEmpty(regardingobjectid_target))
                 throw new ArgumentException("target not found for 'regardingobjectid'", nameof(dynamicMappingsTargets));

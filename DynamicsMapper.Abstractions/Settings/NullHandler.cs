@@ -3,6 +3,6 @@
     public enum DefaultValueHandling
     {
         Map = 0,
-        Skip = 1,
+        Ignore = 1,
     }
 }
