@@ -1,6 +1,7 @@
 using DebuggerClient.Enums;
 using DebuggerClient.Models;
 using DynamicsMapper.Abstractions;
+using DynamicsMapper.Abstractions.Settings;
 using Microsoft.Xrm.Sdk;
 using Tests.Entities;
 using Tests.Enums;
@@ -137,7 +138,7 @@ namespace Tests
         {
             var settings = new DynamicsMapperSettings
             {
-                NullHandling = DynamicsMapper.Abstractions.Settings.NullHandling.Skip
+                DefaultValueHandling = DefaultValueHandling.Skip
             };
             var entity = MapModel(settings);
             ModelToEntityAsserts(entity);

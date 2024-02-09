@@ -5,15 +5,15 @@ namespace DynamicsMapper.Abstractions
 {
     public class DynamicsMapperSettings
     {
-        private const NullHandling _defaultNullHandling = NullHandling.Map;
-        private NullHandling? _nullHandling;
-
         public static DynamicsMapperSettings Default => new();
+
+        private const DefaultValueHandling _defaultDefaultValueHandling = DefaultValueHandling.Map;
+        private DefaultValueHandling? _defaultValueHandling;
         public IPropertyMappers Mappers { get; set; } = new PropertyMappers();
-        public NullHandling NullHandling
+        public DefaultValueHandling DefaultValueHandling
         {
-            get => _nullHandling ?? _defaultNullHandling;
-            set => _nullHandling = value;
+            get => _defaultValueHandling ?? _defaultDefaultValueHandling;
+            set => _defaultValueHandling = value;
         }
     }
 }

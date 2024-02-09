@@ -2,3 +2,12 @@
 using DebuggerClient.Models;
 
 var x = new ContactMapper();
+
+Test();
+
+/// <summary>TEST</summary>
+/// <remarks> WARNING: Important information on the method </remarks>
+void Test()
+{
+
+}

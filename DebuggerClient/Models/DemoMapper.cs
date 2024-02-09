@@ -36,13 +36,13 @@ namespace DebuggerClient.Models
         public string Entityname => entityname;
 
         /// <summary> You can use <see cref = "EmailTargets"/> instead of <see cref = "DynamicsMappingsTargets"/></summary>
-        public Entity Map(Email email, DynamicsMappingsTargets? dynamicMappingsTargets, DynamicsMapperSettings? settings = null)
+        private static Entity InternalMap(Email email, DynamicsMappingsTargets? dynamicMappingsTargets = null, DynamicsMapperSettings? settings = null)
         {
             settings ??= DynamicsMapperSettings.Default;
             var mappers = settings.Mappers;
             var entity = new Entity(entityname);
             entity.Id = mappers.PrimaryIdMapper.MapToEntity(email.Id) ?? Guid.Empty;
-            if (settings.NullHandling != NullHandling.Skip && email.Subject != default)
+            if (settings.DefaultValueHandling != DefaultValueHandling.Skip && email.Subject != default)
                 entity["subject"] = mappers.BasicMapper.MapToEntity<string?>(email.Subject);
             if (dynamicMappingsTargets?.TryGetValue("regardingobjectid", out var regardingobjectid_target) != true || string.IsNullOrEmpty(regardingobjectid_target))
                 throw new ArgumentException("target not found for 'regardingobjectid'", nameof(dynamicMappingsTargets));
@@ -50,16 +50,27 @@ namespace DebuggerClient.Models
             return entity;
         }
 
-        /// <summary> You can use <see cref = "EmailTargets"/> instead of <see cref = "DynamicsMappingsTargets"/></summary>
-        public Email? Map(Entity entity, string alias, DynamicsMapperSettings? settings = null) => InternalMap(entity, settings, alias);
-        /// <summary> You can use <see cref = "EmailTargets"/> instead of <see cref = "DynamicsMappingsTargets"/></summary>
-        public Email Map(Entity entity, DynamicsMapperSettings? settings = null)
+        public Entity Map(Email model, DynamicsMappingsTargets dynamicMappingsTargets, DynamicsMapperSettings settings) => InternalMap(model, dynamicMappingsTargets, settings);
+        public Entity Map(Email model, DynamicsMappingsTargets dynamicMappingsTargets) => InternalMap(model, dynamicMappingsTargets: dynamicMappingsTargets);
+        public Entity Map(Email model, DynamicsMapperSettings settings) => InternalMap(model, settings: settings);
+        public Entity Map(Email model) => InternalMap(model);
+
+        public Email Map(Entity entity)
+        {
+            var email = InternalMap(entity) ?? throw new Exception("Mapping failed");
+            return email;
+        }
+
+        public Email? Map(Entity entity, string alias)
+         => InternalMap(entity, alias: alias);
+        public Email? Map(Entity entity, string alias, DynamicsMapperSettings settings) => InternalMap(entity, settings, alias);
+        public Email Map(Entity entity, DynamicsMapperSettings settings)
         {
             var email = InternalMap(entity, settings) ?? throw new Exception("Mapping failed");
             return email;
         }
 
-        private Email? InternalMap(Entity source, DynamicsMapperSettings? settings, string? alias = null)
+        private static Email? InternalMap(Entity source, DynamicsMapperSettings? settings = null, string? alias = null)
         {
             settings ??= DynamicsMapperSettings.Default;
             var mappers = settings.Mappers;
@@ -84,5 +95,7 @@ namespace DebuggerClient.Models
             email.RegardingTarget = mappers.DynamicLookupTargetMapper.MapToModel(entity, "regardingobjectid");
             return email;
         }
+
+
     }
 }

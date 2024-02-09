@@ -154,7 +154,7 @@ namespace DynamicsMapper
 
                 if (!string.IsNullOrEmpty(attMappings.Value.ToEntity))
                 {
-                    toEntityContent.AppendLine($"if(settings.NullHandling != NullHandling.Skip || {attMappings.Value.AttributRef} != default({attMappings.Value.AttributeType}))");
+                    toEntityContent.AppendLine($"if(settings.DefaultValueHandling != DefaultValueHandling.Skip || {attMappings.Value.AttributRef} != default({attMappings.Value.AttributeType}))");
                     toEntityContent.AppendLine("{");
                     toEntityContent.AppendLine(attMappings.Value.ToEntity);
                     toEntityContent.AppendLine("}");
@@ -199,21 +199,29 @@ namespace DynamicsMapper
                     writer.AppendLine();
 
 
-                    string dynamicsMapperTargets;
                     string dynamicTargetsSummary;
+                    string hasDynamicLookupsWarning;
                     if (hasDynamicLookups)
                     {
-                        dynamicsMapperTargets = $"DynamicsMappingsTargets? dynamicMappingsTargets";
                         dynamicTargetsSummary = $"/// <summary> You can use <see cref=\"{targetClassName}\"/> instead of <see cref=\"DynamicsMappingsTargets\"/></summary>";
+                        hasDynamicLookupsWarning = $"/// <summary> <strong>WARNING</strong>: <see cref=\"{className}\"/> requires the usage of <see cref=\"{targetClassName}\"/> or <see cref=\"DynamicsMappingsTargets\"/> </summary>";
                     }
                     else
                     {
-                        dynamicsMapperTargets = $"DynamicsMappingsTargets? dynamicMappingsTargets = null";
-                        dynamicTargetsSummary = $"/// <summary> You can leave <see cref=\"DynamicsMappingsTargets\"/> null for this mapper</summary>"; ;
+                        dynamicTargetsSummary = string.Empty;
+                        hasDynamicLookupsWarning = string.Empty;
                     }
-
                     writer.AppendLine(dynamicTargetsSummary);
-                    using (writer.BeginScope($"public Entity Map({className} {modelName}, {dynamicsMapperTargets}, DynamicsMapperSettings? settings = null)"))
+                    writer.AppendLine($"public Entity Map({className} {modelName}, DynamicsMappingsTargets dynamicMappingsTargets, DynamicsMapperSettings settings) => InternalMap({modelName}, dynamicMappingsTargets, settings);");
+                    writer.AppendLine(dynamicTargetsSummary);
+                    writer.AppendLine($"public Entity Map({className} {modelName}, DynamicsMappingsTargets dynamicMappingsTargets) => InternalMap({modelName}, dynamicMappingsTargets: dynamicMappingsTargets);");
+
+                    writer.AppendLine(hasDynamicLookupsWarning);
+                    writer.AppendLine($"public Entity Map({className} {modelName}, DynamicsMapperSettings settings) => InternalMap({modelName}, settings: settings);");
+                    writer.AppendLine(hasDynamicLookupsWarning);
+                    writer.AppendLine($"public Entity Map({className} {modelName}) => InternalMap({modelName});");
+
+                    using (writer.BeginScope($"public static Entity InternalMap({className} {modelName}, DynamicsMappingsTargets? dynamicMappingsTargets = null, DynamicsMapperSettings? settings = null)"))
                     {
                         writer.AppendLine("settings ??= DynamicsMapperSettings.Default;");
                         writer.AppendLine("var mappers = settings.Mappers;");
@@ -223,17 +231,21 @@ namespace DynamicsMapper
                         writer.AppendLine("return entity;");
                     }
 
-                    writer.AppendLine(dynamicTargetsSummary);
-                    writer.AppendLine($"public {className}? Map(Entity entity, string alias, DynamicsMapperSettings? settings = null) => InternalMap(entity, settings, alias);");
+                    writer.AppendLine($"public {className}? Map(Entity entity, string alias) => InternalMap(entity, alias: alias);");
+                    writer.AppendLine($"public {className}? Map(Entity entity, string alias, DynamicsMapperSettings settings) => InternalMap(entity, settings, alias);");
 
-                    writer.AppendLine(dynamicTargetsSummary);
-                    using (writer.BeginScope($"public {className} Map(Entity entity, DynamicsMapperSettings? settings = null)"))
+                    using (writer.BeginScope($"public {className} Map(Entity entity)"))
+                    {
+                        writer.AppendLine($"var {modelName} = InternalMap(entity) ?? throw new Exception(\"Mapping failed\");");
+                        writer.AppendLine($"return {modelName};");
+                    }
+                    using (writer.BeginScope($"public {className} Map(Entity entity, DynamicsMapperSettings settings)"))
                     {
                         writer.AppendLine($"var {modelName} = InternalMap(entity, settings) ?? throw new Exception(\"Mapping failed\");");
                         writer.AppendLine($"return {modelName};");
                     }
 
-                    using (writer.BeginScope($"private {className}? InternalMap(Entity source, DynamicsMapperSettings? settings, string? alias = null)"))
+                    using (writer.BeginScope($"private static {className}? InternalMap(Entity source, DynamicsMapperSettings? settings = null, string? alias = null)"))
                     {
                         writer.AppendLine("var mappers = settings?.Mappers ?? DynamicsMapperSettings.Default.Mappers;");
                         writer.AppendLine($"Entity? entity;");
