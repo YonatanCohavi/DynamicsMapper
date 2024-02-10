@@ -66,7 +66,7 @@ namespace Tests
             CollectionAssert.AreEqual(_colorsInt, entity.GetAttributeValue<OptionSetValueCollection>("rtm_mo_fav_colors_int").Select(v => v.Value).ToArray());
         }
         [TestMethod]
-        public void DynamicMappingsToEntity()
+        public void Dynamic_Mappings_To_Entity()
         {
             var emailId = Guid.NewGuid();
             var regardingId = Guid.NewGuid();
@@ -77,21 +77,40 @@ namespace Tests
                 Subject = "email subject"
             };
             var mapper = new EmailMapper();
-            var targets = new EmailTargets
+            var targets = new EmailTargets { Regarding = "account", OwnerId = "team", };
+            var faiingTargets = new EmailTargets { Regarding = string.Empty };
+            var entity = mapper.Map(email, targets);
+            var regardingRef = entity.GetAttributeValue<EntityReference>("regardingobjectid");
+            var ownerRef = entity.GetAttributeValue<EntityReference>("ownerid");
+            Assert.ThrowsException<ArgumentException>(() => mapper.Map(email, faiingTargets));
+            Assert.AreEqual("account", regardingRef.LogicalName);
+            Assert.AreEqual(regardingId, regardingRef.Id);
+            Assert.IsNull(ownerRef);
+        }
+        [TestMethod]
+        public void Dynamic_Mappings_To_Entity_No_Targets()
+        {
+            var emailId = Guid.NewGuid();
+            var regardingId = Guid.NewGuid();
+            var email = new Email
             {
-                Regarding = "account",
-                OwnerId = "team",
+                Regarding = regardingId,
+                RegardingTarget = "account",
+                Id = emailId,
+                Subject = "email subject",
+
             };
+            var mapper = new EmailMapper();
+            var targets = new EmailTargets { OwnerId = "systemuser" };
             var entity = mapper.Map(email, targets);
             var regardingRef = entity.GetAttributeValue<EntityReference>("regardingobjectid");
             var ownerRef = entity.GetAttributeValue<EntityReference>("ownerid");
             Assert.AreEqual("account", regardingRef.LogicalName);
             Assert.AreEqual(regardingId, regardingRef.Id);
             Assert.IsNull(ownerRef);
-
         }
         [TestMethod]
-        public void DynamicMappingsToModel()
+        public void Dynamic_Mappings_To_Model()
         {
             var emailId = Guid.NewGuid();
             var regardingId = Guid.NewGuid();
@@ -108,7 +127,7 @@ namespace Tests
             Assert.IsNull(email.OwnerId);
         }
         [TestMethod]
-        public void EntityToModel()
+        public void Entity_To_Model()
         {
             var mapper = new ContactMapper();
             _sourceEntity.FormattedValues.Add("rtm_l_account", _accountRef.Name);
@@ -127,14 +146,16 @@ namespace Tests
         }
 
         [TestMethod]
-        public void ModelToEntity()
+        public void Model_To_Entity()
         {
             var entity = MapModel(DynamicsMapperSettings.Default);
             ModelToEntityAsserts(entity);
+            Assert.IsTrue(entity.Contains("rtm_s_lastname"));
+            Assert.IsNull(entity["rtm_s_lastname"]);
         }
 
         [TestMethod]
-        public void ModelToEntitySkipDefault()
+        public void Model_To_Entity_Skip_Default()
         {
             var settings = new DynamicsMapperSettings
             {

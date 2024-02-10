@@ -76,9 +76,17 @@ namespace DynamicsMapper
                     .Where(g => g.Count() > 1)
                     .SelectMany(g => g);
 
+                var duplicateMappings = fieldsGenerationDetails
+                  .Where(dg => !string.IsNullOrEmpty(dg.SchemaName))
+                  .GroupBy(dg => new { dg.Mapping, dg.SchemaName })
+                  .Where(g => g.Count() > 1)
+                  .SelectMany(g => g);
 
                 foreach (var duplicate in duplicateSchemas)
                     duplicate.PropertySymbol.SetDiagnostic(ctx, DiagnosticsDescriptors.DuplicateSchemas, details.MapperSymbol.Name, duplicate.SchemaName!);
+
+                foreach (var duplicate in duplicateMappings)
+                    duplicate.PropertySymbol.SetDiagnostic(ctx, DiagnosticsDescriptors.DuplicateMappings, details.MapperSymbol.Name, duplicate.SchemaName!, duplicate.Mapping.ToString());
 
                 if (fieldsGenerationDetails.Count(gd => gd.Mapping == MappingType.PrimaryId) > 1)
                 {
@@ -134,9 +142,9 @@ namespace DynamicsMapper
                                  .ToString();
             ctx.AddSource($"EntityExtentions.g.cs", classContent);
         }
-        private static MapperClassDetails GenerateMapperClass(ClassDeclarationSyntax mapperSyntax, string entityName, FieldGenerationDetails[] generationDetails, string mapperClassName, ICollection<MapperDetails> createdMappers, SourceProductionContext ctx)
+        private static MapperClassDetails GenerateMapperClass(ClassDeclarationSyntax mapperSyntax, string entityName, FieldGenerationDetails[] attributes, string mapperClassName, ICollection<MapperDetails> createdMappers, SourceProductionContext ctx)
         {
-            var columns = generationDetails.Where(a => !string.IsNullOrEmpty(a.SchemaName)).Select(a => $"\"{a.SchemaName}\"").Distinct().ToList();
+            var columns = attributes.Where(a => !string.IsNullOrEmpty(a.SchemaName)).Select(a => $"\"{a.SchemaName}\"").Distinct().ToList();
             var @namespace = mapperSyntax.GetParent<BaseNamespaceDeclarationSyntax>()!.Name.ToString();
             var toEntityContent = new StringBuilder();
             var toModelContent = new StringBuilder();
@@ -144,9 +152,33 @@ namespace DynamicsMapper
             var modelName = $"{char.ToLower(className[0])}{className.Substring(1)}";
 
             var mappings = new List<Mappings>();
-            foreach (var attribute in generationDetails)
+            // dynamic lookups are using lookuptargets to resolve. we will map that last
+            foreach (var attribute in attributes.Where(m => m.Mapping != MappingType.DynamicLookup))
             {
                 var attMappings = GetMapperContent(modelName, attribute, createdMappers, ctx);
+                var hasSetter = attribute.PropertySymbol.SetMethod is not null;
+
+                if (!attMappings.HasValue)
+                    continue;
+
+                if (!string.IsNullOrEmpty(attMappings.Value.ToEntity))
+                {
+                    toEntityContent.AppendLine($"if(settings.DefaultValueHandling != DefaultValueHandling.Ignore || {attMappings.Value.AttributRef} != default({attMappings.Value.AttributeType}))");
+                    toEntityContent.AppendLine("{");
+                    toEntityContent.AppendLine(attMappings.Value.ToEntity);
+                    toEntityContent.AppendLine("}");
+                }
+
+                if (hasSetter)
+                {
+                    toModelContent.AppendLine(attMappings.Value.ToModel);
+                }
+                mappings.Add(attMappings.Value);
+            }
+            foreach (var attribute in attributes.Where(m => m.Mapping == MappingType.DynamicLookup))
+            {
+                var targetlookup = mappings.FirstOrDefault(m => m.Type == MappingType.DynamicLookupTarget && m.Attribute.SchemaName == attribute.SchemaName);
+                var attMappings = GenerateDynamicLookupMappings(modelName, targetlookup.AttributRef, attribute, ctx);
                 var hasSetter = attribute.PropertySymbol.SetMethod is not null;
 
                 if (!attMappings.HasValue)
@@ -169,7 +201,7 @@ namespace DynamicsMapper
             var targetClassName = string.Empty;
             var hasDynamicLookups = mappings.Any(m => m.Type == MappingType.DynamicLookup);
             var dynamicMappingsClass = hasDynamicLookups
-                ? GenerateDynamicsmappingClass(className, generationDetails, out targetClassName)
+                ? GenerateDynamicsmappingClass(className, attributes, out targetClassName)
                 : string.Empty;
 
             var writer = new CodeWriter();
@@ -204,7 +236,7 @@ namespace DynamicsMapper
                     if (hasDynamicLookups)
                     {
                         dynamicTargetsSummary = $"/// <summary> You can use <see cref=\"{targetClassName}\"/> instead of <see cref=\"DynamicsMappingsTargets\"/></summary>";
-                        hasDynamicLookupsWarning = $"/// <summary> <strong>WARNING</strong>: <see cref=\"{className}\"/> requires the usage of <see cref=\"{targetClassName}\"/> or <see cref=\"DynamicsMappingsTargets\"/> </summary>";
+                        hasDynamicLookupsWarning = $"/// <summary> <strong>NOTE: </strong>: <see cref=\"{className}\"/> requires the usage of <see cref=\"{targetClassName}\"/> or <see cref=\"DynamicsMappingsTargets\"/> if you are using this method then the targets should be passed using the '{nameof(MappingType.DynamicLookupTarget)}' mapping</summary>";
                     }
                     else
                     {
@@ -312,13 +344,13 @@ namespace DynamicsMapper
                 MappingType.Options => GenerateOptionsMappings(modelName, attribute, ctx),
                 MappingType.PrimaryId => GeneratePrimaryIdMappings(modelName, attribute, ctx),
                 MappingType.Link => GenerateLinkMappings(modelName, attribute, createdMappers, ctx),
-                MappingType.DynamicLookup => GenerateDynamicLookupMappings(modelName, attribute, ctx),
+                MappingType.DynamicLookup => throw new Exception("Dynamic Lookups should be resolved last."),
                 MappingType.DynamicLookupTarget => GenerateDynamicLookupTargetMappings(modelName, attribute, ctx),
                 _ => throw new Exception($"{attribute.Mapping} is not defined"),
             };
         }
 
-        private static Mappings? GenerateDynamicLookupMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
+        private static Mappings? GenerateDynamicLookupMappings(string modelName, string? correspondingTargetLookup, FieldGenerationDetails attribute, SourceProductionContext ctx)
         {
             var allowedTypes = GetAllowedTypes(MappingType.DynamicLookup);
             var typeSymbol = attribute.PropertySymbol.Type.GetUnelyingType().Name;
@@ -334,8 +366,17 @@ namespace DynamicsMapper
             var attributeType = attribute.PropertySymbol.Type.ToString();
             var attributeRef = $"{modelName}.{attribute.PropertySymbol.Name}";
 
-
-            toEntity.AppendLine($"if (dynamicMappingsTargets?.TryGetValue(\"{attribute.SchemaName}\",out var {attribute.SchemaName}_target) != true || string.IsNullOrEmpty({attribute.SchemaName}_target))");
+            if (!string.IsNullOrEmpty(correspondingTargetLookup))
+            {
+                toEntity.AppendLine($"string {attribute.SchemaName}_target;");
+                toEntity.AppendLine($"if (!string.IsNullOrEmpty({correspondingTargetLookup}))");
+                toEntity.AppendLine($"{attribute.SchemaName}_target = {correspondingTargetLookup};");
+                toEntity.AppendLine($"else if (dynamicMappingsTargets?.TryGetValue(\"{attribute.SchemaName}\",out {attribute.SchemaName}_target) != true || string.IsNullOrEmpty({attribute.SchemaName}_target))");
+            }
+            else
+            {
+                toEntity.AppendLine($"if (dynamicMappingsTargets?.TryGetValue(\"{attribute.SchemaName}\",out var {attribute.SchemaName}_target) != true || string.IsNullOrEmpty({attribute.SchemaName}_target))");
+            }
             toEntity.AppendLine($"throw new ArgumentException(\"target not found for '{attribute.SchemaName}'\",nameof(dynamicMappingsTargets));");
             if (attribute.PropertySymbol.NullableAnnotation == NullableAnnotation.Annotated)
             {
@@ -347,7 +388,7 @@ namespace DynamicsMapper
                 toModel = $"{attributeRef} = mappers.LookupMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? Guid.Empty;";
                 toEntity.AppendLine($"entity[\"{attribute.SchemaName}\"] = mappers.LookupMapper.MapToEntity({attributeRef},{attribute.SchemaName}_target);");
             }
-            return new Mappings(toModel, toEntity.ToString(), attributeType, attributeRef, MappingType.DynamicLookup);
+            return new Mappings(toModel, toEntity.ToString(), attributeType, attributeRef, MappingType.DynamicLookup, attribute);
         }
 
         private static Mappings? GenerateDynamicLookupTargetMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
@@ -372,7 +413,7 @@ namespace DynamicsMapper
             {
                 toModel = $"{attributeRef} = mappers.DynamicLookupTargetMapper.MapToModel(entity,\"{attribute.SchemaName}\") ?? string.Empty;";
             }
-            return new Mappings(toModel, string.Empty, attributeType, attributeRef, MappingType.DynamicLookupTarget);
+            return new Mappings(toModel, string.Empty, attributeType, attributeRef, MappingType.DynamicLookupTarget, attribute);
         }
 
         private static Mappings? GenerateLinkMappings(string modelName, FieldGenerationDetails attribute, ICollection<MapperDetails> createdMappers, SourceProductionContext ctx)
@@ -406,7 +447,7 @@ namespace DynamicsMapper
             cw.AppendLine($"if (mapped_{linkDetails.EntityName} != null)");
             cw.AppendLine($"{modelName}.{attribute.PropertySymbol.Name} = mapped_{linkDetails.EntityName};");
             toModel = cw.ToString();
-            return new Mappings(toModel, string.Empty, string.Empty, attributeRef, MappingType.Link);
+            return new Mappings(toModel, string.Empty, string.Empty, attributeRef, MappingType.Link, attribute);
         }
 
         private static Mappings? GeneratePrimaryIdMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
@@ -432,7 +473,7 @@ namespace DynamicsMapper
             {
                 toModel = $"{attributeRef} = mappers.PrimaryIdMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? Guid.Empty;";
             }
-            return new Mappings(toModel, toEntity, attributeType, attributeRef, MappingType.PrimaryId);
+            return new Mappings(toModel, toEntity, attributeType, attributeRef, MappingType.PrimaryId, attribute);
         }
 
         private static Mappings? GenerateOptionsMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
@@ -474,7 +515,7 @@ namespace DynamicsMapper
                 else
                     toModel = $"{attributeRef} = mappers.OptionsetMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? 0;";
             }
-            return new Mappings(toModel, toEntity, attributeType, attributeRef, MappingType.Options);
+            return new Mappings(toModel, toEntity, attributeType, attributeRef, MappingType.Options, attribute);
         }
 
         private static Mappings? GenerateMultipleOptionsMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
@@ -526,7 +567,7 @@ namespace DynamicsMapper
                 else
                     toModel = $"{attributeRef} = mappers.OptionSetValueCollectionMapper.MapToModel(entity, \"{attribute.SchemaName}\");";
             }
-            return new Mappings(toModel, toEntity, attributeType, attributeRef, MappingType.MultipleOptions);
+            return new Mappings(toModel, toEntity, attributeType, attributeRef, MappingType.MultipleOptions, attribute);
         }
 
         private static Mappings? GenerateFormattedMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
@@ -551,7 +592,7 @@ namespace DynamicsMapper
             {
                 toModel = $"{attributeRef} = mappers.FormattedValuesMapper.MapToModel(entity,\"{attribute.SchemaName}\") ?? string.Empty;";
             }
-            return new Mappings(toModel, string.Empty, attributeType, attributeRef, MappingType.Formatted);
+            return new Mappings(toModel, string.Empty, attributeType, attributeRef, MappingType.Formatted, attribute);
         }
 
         private static Mappings? GenerateMoneyMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
@@ -579,7 +620,7 @@ namespace DynamicsMapper
                 toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.MoneyMapper.MapToEntity({attributeRef});";
                 toModel = $"{modelName}.{attribute.PropertySymbol.Name} = mappers.MoneyMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? 0m;";
             }
-            return new Mappings(toModel, toEntity, attributeType, attributeRef, MappingType.Money);
+            return new Mappings(toModel, toEntity, attributeType, attributeRef, MappingType.Money, attribute);
         }
 
         private static Mappings? GenerateLookupMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
@@ -607,7 +648,7 @@ namespace DynamicsMapper
                 toModel = $"{attributeRef} = mappers.LookupMapper.MapToModel(entity, \"{attribute.SchemaName}\") ?? Guid.Empty;";
                 toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.LookupMapper.MapToEntity({attributeRef},\"{attribute.Target}\");";
             }
-            return new Mappings(toModel, toEntity, attributeType, attributeRef, MappingType.Lookup);
+            return new Mappings(toModel, toEntity, attributeType, attributeRef, MappingType.Lookup, attribute);
         }
         private static Mappings? GenerateBasicMappings(string modelName, FieldGenerationDetails attribute, SourceProductionContext ctx)
         {
@@ -624,7 +665,7 @@ namespace DynamicsMapper
             }
             var toModel = $"{attributeRef} = mappers.BasicMapper.MapToModel<{attributeType}>(entity, \"{attribute.SchemaName}\");";
             var toEntity = $"entity[\"{attribute.SchemaName}\"] = mappers.BasicMapper.MapToEntity<{attributeType}>({attributeRef});";
-            return new Mappings(toModel, toEntity, attributeType, attributeRef, MappingType.Basic);
+            return new Mappings(toModel, toEntity, attributeType, attributeRef, MappingType.Basic, attribute);
         }
 
         private static IEnumerable<FieldGenerationDetails> ExtractAttributes(IEnumerable<IPropertySymbol> properties, INamedTypeSymbol crmFieldAttributeSymbol, INamedTypeSymbol crmLinkAttributeSymbol, SourceProductionContext ctx)

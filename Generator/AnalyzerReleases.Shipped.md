@@ -12,3 +12,4 @@ DYM005  | DynamicsMapper | Error    | Class has multiple 'PrimaryId' mappings.
 DYM006  | DynamicsMapper | Error    | CrmEntity decorated class must be partial.
 DYM007  | DynamicsMapper | Warning  | Dulplicate schama names.
 DYM008  | DynamicsMapper | Error    | Destination mapper not found for type.
+DYM009  | DynamicsMapper | Error    | Model has other attributes with the same schema name and mapping.

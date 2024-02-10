@@ -67,5 +67,13 @@ namespace DynamicsMapper
             category: "DynamicsMapper",
             DiagnosticSeverity.Error,
             isEnabledByDefault: true);
+
+        public static readonly DiagnosticDescriptor DuplicateMappings = new(
+          id: "DYM009",
+          title: "Dulplicate mapping",
+          messageFormat: "{0} has other attributes with the schema name \"{1}\" using the \"{2}\" mapping type",
+          category: "DynamicsMapper",
+          DiagnosticSeverity.Error,
+          isEnabledByDefault: true);
     }
 }

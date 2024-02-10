@@ -2,3 +2,4 @@
 using DebuggerClient.Models;
 
 var x = new ContactMapper();
+var a = new Targets(new RegardingTarget("test"), "asd");
