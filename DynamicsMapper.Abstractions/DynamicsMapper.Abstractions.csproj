@@ -6,6 +6,8 @@
     <LangVersion>9.0</LangVersion>
     <Nullable>enable</Nullable>
     <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SignAssembly>True</SignAssembly>
+    <AssemblyOriginatorKeyFile>DynamicsMapperSettings.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
 
   <ItemGroup>
