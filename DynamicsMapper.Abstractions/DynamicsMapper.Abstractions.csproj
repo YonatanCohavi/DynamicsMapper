@@ -7,7 +7,8 @@
     <Nullable>enable</Nullable>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SignAssembly>True</SignAssembly>
-    <AssemblyOriginatorKeyFile>DynamicsMapperSettings.snk</AssemblyOriginatorKeyFile>
+    <AssemblyOriginatorKeyFile>DynamicsMapper.Abstractions.snk</AssemblyOriginatorKeyFile>
+    <FileVersion>1.1.0.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
