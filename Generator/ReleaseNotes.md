@@ -15,3 +15,7 @@ This version has some major changes.
 
 ## v1.1.1 - 2024-02-10
 * using `DynamicLookupTarget` to resolve DynamicLookups if posible.
+
+## v1.1.4 - 2024-03-05
+* using `DynamicLookupTarget` bug fixed.
+* added `long` to the basic mapper

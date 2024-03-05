@@ -710,15 +710,15 @@ namespace DynamicsMapper
         {
             return mappingType switch
             {
-                MappingType.Basic => new[] { typeof(bool), typeof(Guid), typeof(int), typeof(DateTime), typeof(double), typeof(decimal), typeof(string) },
-                MappingType.Lookup => new[] { typeof(Guid) },
-                MappingType.Money => new[] { typeof(decimal) },
-                MappingType.Formatted => new[] { typeof(string) },
-                MappingType.Options => new[] { typeof(int) },
-                MappingType.PrimaryId => new[] { typeof(Guid) },
+                MappingType.Basic => [typeof(bool), typeof(Guid), typeof(int), typeof(DateTime), typeof(double), typeof(float), typeof(decimal), typeof(string), typeof(long)],
+                MappingType.Lookup => [typeof(Guid)],
+                MappingType.Money => [typeof(decimal)],
+                MappingType.Formatted => [typeof(string)],
+                MappingType.Options => [typeof(int)],
+                MappingType.PrimaryId => [typeof(Guid)],
                 MappingType.MultipleOptions => [],
-                MappingType.DynamicLookup => new[] { typeof(Guid) },
-                MappingType.DynamicLookupTarget => new[] { typeof(string) },
+                MappingType.DynamicLookup => [typeof(Guid)],
+                MappingType.DynamicLookupTarget => [typeof(string)],
                 _ => throw new Exception($"Unknown mapping type: {mappingType}"),
             };
         }
