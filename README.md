@@ -106,3 +106,28 @@ And that's it! You can now use the source generator to generate mapper classes f
 
 ** every mapper interface is used for the equivalent mapping type 
 ** the `DynamicLookupTarget` mapping type is using the `ILookupMapper`
+
+# PartialMappers
+
+## FastMappers
+
+- Dynamically maps properties based on attributes and expressions.
+- Supports custom expressions for overriding default mappings.
+- Ensures only attributes with CRM field definitions (`CrmFieldAttribute`) are considered for mapping.
+
+## Usage
+
+``` csharp
+var entity = new Entity("person");
+entity.Id = Guid.NewGuid();
+entity["firstname"] = "Jane";
+entity["lastname"] = "Doe";
+
+var partialMapper = PersonMapper.CreatePartialMapper((e) => new { e.FirstName, e.LastName });
+var model = partialMapper.Map(entity);
+
+model.FirstName == "Jane" // true
+model.LastName == "Doe" // true
+```
+
+*** The creation of the partial mapper is using runtiem expression compilation. It is best to create the mapper once and use it multiple times. (do not create a mapper for each use. this may cause performance issues)

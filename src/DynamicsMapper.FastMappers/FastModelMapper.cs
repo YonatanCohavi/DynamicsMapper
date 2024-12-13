@@ -13,4 +13,3 @@ namespace DynamicsMapper.FastMappers
         public T Map(Entity entity, DynamicsMapperSettings settings) => _mapping(entity, settings);
     }
 }
-;
