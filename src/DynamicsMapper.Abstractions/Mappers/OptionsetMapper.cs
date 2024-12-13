@@ -2,7 +2,7 @@
 
 namespace DynamicsMapper.Abstractions.Mappers
 {
-    public class OptionsetMapper : IOptionsetMapper
+    public sealed class OptionsetMapper : IOptionsetMapper
     {
         private static OptionsetMapper? _mapper;
         public static OptionsetMapper Instance => _mapper ??= new OptionsetMapper();

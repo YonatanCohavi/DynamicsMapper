@@ -12,7 +12,7 @@
 
     <PackageProjectUrl>https://github.com/YonatanCohavi/DynamicsMapper</PackageProjectUrl>
     <PackageId>YC.DynamicsMapper</PackageId>
-    <PackageVersion>1.1.4</PackageVersion>
+    <PackageVersion>2.0.7-beta</PackageVersion>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageDescription>
       A .NET source generator for generating dynamics crm Enity mappings.
@@ -21,7 +21,11 @@
     <PackageTags>Mapper SourceGenerator Dynamics CRM Dataverse 365</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>
-      * Fixed CS8627 error on IEntityMapper. (nullable type constraint)
+      * Added FastMappers
+      * Can map directly to another object
+      * FastToEntityMappers are using models instead of the source model
+      * Supporst unequal names between Model and destination
+      * Strong named DynamicsMapper.FastMappers
     </PackageReleaseNotes>
   </PropertyGroup>
 
@@ -43,10 +47,11 @@
   
   <ItemGroup>
     <!-- Package the generator in the analyzer directory of the nuget package -->
-    <None Include="../README.md" Pack="true" PackagePath="\" />
+    <None Include="../../README.md" Pack="true" PackagePath="\" />
     <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
     <None Include="$(OutputPath)\$(AssemblyName).Abstractions.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
     <None Include="$(OutputPath)\$(AssemblyName).Abstractions.dll" Pack="true" PackagePath="lib\netstandard2.0" Visible="true" />
+    <None Include="$(OutputPath)\$(AssemblyName).FastMappers.dll" Pack="true" PackagePath="lib\netstandard2.0" Visible="true" />
   </ItemGroup>
 
   <ItemGroup>
@@ -56,5 +61,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DynamicsMapper.Abstractions\DynamicsMapper.Abstractions.csproj" GeneratePathProperty="true" PrivateAssets="All" />
+    <ProjectReference Include="..\DynamicsMapper.FastMappers\DynamicsMapper.FastMappers.csproj" PrivateAssets="All"/>
   </ItemGroup>
 </Project>

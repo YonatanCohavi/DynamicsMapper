@@ -2,7 +2,7 @@
 
 namespace DynamicsMapper.Abstractions.Mappers
 {
-    public class DynamicLookupTargetMapper : IDynamicLookupTargetMapper
+    public sealed class DynamicLookupTargetMapper : IDynamicLookupTargetMapper
     {
         private static DynamicLookupTargetMapper? _mapper;
         public static DynamicLookupTargetMapper Instance => _mapper ??= new DynamicLookupTargetMapper();

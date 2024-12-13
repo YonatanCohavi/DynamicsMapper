@@ -213,6 +213,8 @@ namespace DynamicsMapper
             writer.AddUsing("DynamicsMapper.Extension");
             writer.AddUsing("DynamicsMapper.Abstractions.Settings");
             writer.AddUsing("DynamicsMapper.Abstractions");
+            writer.AddUsing("System.Linq.Expressions");
+            writer.AddUsing("DynamicsMapper.FastMappers");
             //writer.AddUsing("DynamicsMapper.Mappers");
             writer.AddUsing("System");
             writer.AppendLine();
@@ -228,6 +230,8 @@ namespace DynamicsMapper
                     writer.AppendLine($"public ColumnSet Columns => new ColumnSet(columns);");
                     writer.AppendLine($"private const string entityname = \"{entityName}\";");
                     writer.AppendLine($"public string Entityname => entityname;");
+                    writer.AppendLine($"public static FastMapper<{className}, TPModel> CreatePartialMapper<TPModel>(Expression<Func<{className}, TPModel>> selector) => new(selector);\n");
+
                     writer.AppendLine();
 
 
@@ -253,7 +257,7 @@ namespace DynamicsMapper
                     writer.AppendLine(hasDynamicLookupsWarning);
                     writer.AppendLine($"public Entity Map({className} {modelName}) => InternalMap({modelName});");
 
-                    using (writer.BeginScope($"public static Entity InternalMap({className} {modelName}, DynamicsMappingsTargets? dynamicMappingsTargets = null, DynamicsMapperSettings? settings = null)"))
+                    using (writer.BeginScope($"private static Entity InternalMap({className} {modelName}, DynamicsMappingsTargets? dynamicMappingsTargets = null, DynamicsMapperSettings? settings = null)"))
                     {
                         writer.AppendLine("settings ??= DynamicsMapperSettings.Default;");
                         writer.AppendLine("var mappers = settings.Mappers;");
