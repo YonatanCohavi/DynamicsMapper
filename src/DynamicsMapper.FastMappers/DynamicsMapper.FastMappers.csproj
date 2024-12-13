@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>DynamicsMapper.FastMappers</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <SignAssembly>True</SignAssembly>
+    <AssemblyOriginatorKeyFile>DynamicsMapper.FastMappers.snk</AssemblyOriginatorKeyFile>
+    <FileVersion>1.0.0.0</FileVersion>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="..\DynamicsMapper.Abstractions\DynamicsMapper.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>
