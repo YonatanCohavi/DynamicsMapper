@@ -1,4 +1,5 @@
 ﻿using DynamicsMapper.Abstractions;
+using System;
 
 namespace Tests.Entities
 {
@@ -26,52 +27,51 @@ namespace Tests.Entities
         public Guid? DivitionManagerId { get; set; }
         /// <summary> שם ומספר פרויקט <para>rtm_name</para> </summary>
         [CrmField("rtm_name")]
-        public string? FullName { get; set; }
+        public string FullName { get; set; }
         /// <summary> מספר פרויקט <para>rtm_s_project</para> </summary>
         [CrmField("rtm_s_project")]
-        public string? ProjectNumber { get; set; }
+        public string ProjectNumber { get; set; }
         /// <summary> סטטוס <para>statuscode</para> </summary>
         [CrmField("statuscode", Mapping = MappingType.Options)]
         public int Statuscode { get; set; }
         [CrmField("statuscode", Mapping = MappingType.Formatted)]
-        public string? StatuscodeName { get; set; }
+        public string StatuscodeName { get; set; }
         /// <summary> (לא בשימוש)שלב הפרויקט <para>rtm_o_project_level</para> </summary>
         [CrmField("rtm_o_project_level", Mapping = MappingType.Formatted)]
-        public string? ProjectLevelName { get; set; }
+        public string ProjectLevelName { get; set; }
         /// <summary> (לא בשימוש(חטיבה <para>rtm_o_unit</para> </summary>
         [CrmField("rtm_o_unit", Mapping = MappingType.Formatted)]
-        public string? UnitName { get; set; }
+        public string UnitName { get; set; }
         /// <summary> (לא בשימוש)תחום ראשי <para>rtm_o_main_confines</para> </summary>
         [CrmField("rtm_o_main_confines", Mapping = MappingType.Formatted)]
-        public string? MainConfinesName { get; set; }
+        public string MainConfinesName { get; set; }
         [CrmField("rtm_s_marketing_project")]
-        public string? MarketingProject { get; set; }
+        public string MarketingProject { get; set; }
         [CrmField("rtm_s_name")]
-        public string? Name { get; set; }
-
+        public string Name { get; set; }
         /// <summary> לקוח 1 <para>rtm_id_account1</para> </summary>
         [CrmField("rtm_id_account1", Mapping = MappingType.Lookup, Target = "account")]
         public Guid? Account1Id { get; set; }
         [CrmField("rtm_id_account1", Mapping = MappingType.Formatted)]
-        public string? Account1Name { get; set; }
+        public string Account1Name { get; set; }
         /// <summary> לקוח 2 <para>rtm_id_account2</para> </summary>
         [CrmField("rtm_id_account2", Mapping = MappingType.Lookup, Target = "account")]
         public Guid? Account2Id { get; set; }
         [CrmField("rtm_id_account2", Mapping = MappingType.Formatted)]
-        public string? Account2Name { get; set; }
+        public string Account2Name { get; set; }
         /// <summary> עיר <para>rtm_id_city</para> </summary>
         [CrmField("rtm_id_city", Mapping = MappingType.Lookup, Target = "rtm__id_cities")]
         public Guid? CityId { get; set; }
         [CrmField("rtm_id_city", Mapping = MappingType.Formatted)]
-        public string? CityName { get; set; }
+        public string CityName { get; set; }
         /// <summary> רחוב <para>rtm_s_address</para> </summary>
         [CrmField("rtm_s_address")]
-        public string? Street { get; set; }
+        public string Street { get; set; }
         /// <summary> תיאור פרויקט <para>rtm_s_description</para> </summary>
         [CrmField("rtm_s_description")]
-        public string? Description { get; set; }
+        public string Description { get; set; }
         /// <summary> מספר בית <para>rtm_s_house_number</para> </summary>
         [CrmField("rtm_s_house_number")]
-        public string? HouseNumber { get; set; }
+        public string HouseNumber { get; set; }
     }
 }

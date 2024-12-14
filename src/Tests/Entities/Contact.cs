@@ -1,4 +1,5 @@
 ﻿using DynamicsMapper.Abstractions;
+using System;
 using Tests.Enums;
 
 namespace Tests.Entities

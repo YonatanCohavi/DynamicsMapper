@@ -1,4 +1,6 @@
 ﻿using Microsoft.Xrm.Sdk;
+using System;
+using System.Linq;
 using Tests.Entities;
 using Tests.Enums;
 

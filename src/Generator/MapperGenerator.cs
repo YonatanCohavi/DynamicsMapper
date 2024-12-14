@@ -123,7 +123,7 @@ namespace DynamicsMapper
                         writer.AppendLine("var attributes = entity.Attributes.Where(e => e.Key.StartsWith(alias)).ToArray();");
                         writer.AppendLine("if (!attributes.Any()) return null;");
                         writer.AppendLine("var aliasEntity = new Entity();");
-                        using (writer.BeginScope($"foreach (var attribute in attributes)"))
+                        using (writer.BeginScope("foreach (var attribute in attributes)"))
                         {
                             writer.AppendLine("if (!(attribute.Value is AliasedValue aliasedValued)) continue;");
                             writer.AppendLine("if (string.IsNullOrEmpty(aliasEntity.LogicalName))");
@@ -227,10 +227,10 @@ namespace DynamicsMapper
                 using (writer.BeginScope($"public class {mapperClassName} : IEntityMapper<{className}>"))
                 {
                     writer.AppendLine($"private static readonly string[] columns = new[] {{{string.Join(", ", columns)}}};");
-                    writer.AppendLine($"public ColumnSet Columns => new ColumnSet(columns);");
+                    writer.AppendLine("public ColumnSet Columns => new ColumnSet(columns);");
                     writer.AppendLine($"private const string entityname = \"{entityName}\";");
-                    writer.AppendLine($"public string Entityname => entityname;");
-                    writer.AppendLine($"public static FastMapper<{className}, TPModel> CreatePartialMapper<TPModel>(Expression<Func<{className}, TPModel>> selector) => new(selector);\n");
+                    writer.AppendLine("public string Entityname => entityname;");
+                    writer.AppendLine($"public static FastMapper<{className}, TPModel> CreatePartialMapper<TPModel>(Expression<Func<{className}, TPModel>> selector) => new FastMapper<{className}, TPModel>(selector);");
 
                     writer.AppendLine();
 

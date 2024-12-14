@@ -1,4 +1,5 @@
 ﻿using DynamicsMapper.Abstractions;
+using System;
 
 namespace DebuggerClient.Models
 {

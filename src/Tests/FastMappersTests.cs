@@ -1,4 +1,5 @@
 ﻿using Microsoft.Xrm.Sdk;
+using System;
 using Tests.Entities;
 
 namespace Tests
@@ -9,9 +10,8 @@ namespace Tests
         [TestMethod]
         public void FastToModelMapper()
         {
-            var fastMapper = DemoEntityMapper.CreatePartialMapper((e) => new { e.Age, e.Birthdate });
-
-            var model = fastMapper.Map(TestData.SourceEntity);
+            var partialMapper = DemoEntityMapper.CreatePartialMapper((e) => new { e.Age, e.Birthdate });
+            var model = partialMapper.Map(TestData.SourceEntity);
             Assert.AreEqual(model.Age, TestData.SourceEntity.GetAttributeValue<int>("rtm_i_age"));
             Assert.AreEqual(model.Birthdate, TestData.SourceEntity.GetAttributeValue<DateTime>("rtm_dt_birthdate"));
         }
@@ -19,13 +19,13 @@ namespace Tests
         [TestMethod]
         public void FastToModelMapper_ClassDestination()
         {
-            var fastMapper = DemoEntityMapper.CreatePartialMapper((e) => new DemoPartialModel
+            var partialMapper = DemoEntityMapper.CreatePartialMapper((e) => new DemoPartialModel
             {
                 Id = e.DemoId!.Value,
                 IntContantType = e.IntContantType,
                 StaticValue = "static Value"
             });
-            var model = fastMapper.Map(TestData.SourceEntity);
+            var model = partialMapper.Map(TestData.SourceEntity);
             Assert.AreEqual(model.StaticValue, "static Value");
             Assert.AreEqual(model.Id, TestData.SourceEntity.Id);
             Assert.AreEqual(model.IntContantType, TestData.SourceEntity.GetAttributeValue<OptionSetValue>("rtm_o_type_int").Value);
@@ -34,13 +34,14 @@ namespace Tests
         [TestMethod]
         public void FastToEntityMapper()
         {
-            var fastModelMapper = DemoEntityMapper.CreatePartialMapper((c) => new
+            var partialMapper = DemoEntityMapper.CreatePartialMapper((c) => new
             {
                 c.DemoId,
             });
-            var entity = fastModelMapper.Map(new { DemoId = (Guid?)TestData.EntityId });
+            var entity = partialMapper.Map(new { DemoId = (Guid?)TestData.EntityId });
             Assert.AreEqual(entity.Id, TestData.EntityId);
             Assert.AreEqual(entity.GetAttributeValue<Guid>("demoid"), TestData.EntityId);
+            Assert.AreEqual(entity.Attributes.Count, 1);
         }
 
         [TestMethod]

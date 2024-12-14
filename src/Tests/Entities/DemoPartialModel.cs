@@ -1,4 +1,6 @@
-﻿namespace Tests.Entities
+﻿using System;
+
+namespace Tests.Entities
 {
     public class DemoPartialModel
     {
