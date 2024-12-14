@@ -12,7 +12,7 @@
 
     <PackageProjectUrl>https://github.com/YonatanCohavi/DynamicsMapper</PackageProjectUrl>
     <PackageId>YC.DynamicsMapper</PackageId>
-    <PackageVersion>2.1.0</PackageVersion>
+    <PackageVersion>2.1.1</PackageVersion>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageDescription>
       A .NET source generator for generating dynamics crm Enity mappings.
@@ -21,6 +21,7 @@
     <PackageTags>Mapper SourceGenerator Dynamics CRM Dataverse 365</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>
+      * FastMappers factory moved to Mappers as CreatePartialMapper
       * Added FastMappers
       * Can map directly to another object
       * FastToEntityMappers are using models instead of the source model
