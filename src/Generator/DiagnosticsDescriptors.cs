@@ -63,7 +63,7 @@ namespace DynamicsMapper
         public static readonly DiagnosticDescriptor DestinationMapperNotFound = new(
             id: "DYM008",
             title: "Destination mapper not found",
-            messageFormat: "Destination mapper not found for the type '{0}'",
+            messageFormat: "Mapper not found for the '{0}'",
             category: "DynamicsMapper",
             DiagnosticSeverity.Error,
             isEnabledByDefault: true);
@@ -75,5 +75,13 @@ namespace DynamicsMapper
           category: "DynamicsMapper",
           DiagnosticSeverity.Error,
           isEnabledByDefault: true);
+
+        public static readonly DiagnosticDescriptor LinkMustBeUsedOnClass = new(
+           id: "DYM010",
+           title: "CrmLinkAttribute must be used on an object",
+           messageFormat: "CrmLinkAttribute must be used on a class",
+           category: "DynamicsMapper",
+           DiagnosticSeverity.Error,
+           isEnabledByDefault: true);
     }
 }

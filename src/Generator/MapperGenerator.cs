@@ -215,7 +215,7 @@ namespace DynamicsMapper
             writer.AddUsing("DynamicsMapper.Abstractions");
             writer.AddUsing("System.Linq.Expressions");
             writer.AddUsing("DynamicsMapper.FastMappers");
-            //writer.AddUsing("DynamicsMapper.Mappers");
+
             writer.AddUsing("System");
             writer.AppendLine();
 
@@ -284,18 +284,18 @@ namespace DynamicsMapper
                     using (writer.BeginScope($"private static {className}? InternalMap(Entity source, DynamicsMapperSettings? settings = null, string? alias = null)"))
                     {
                         writer.AppendLine("var mappers = settings?.Mappers ?? DynamicsMapperSettings.Default.Mappers;");
-                        writer.AppendLine($"Entity? entity;");
-                        using (writer.BeginScope($"if (string.IsNullOrEmpty(alias))"))
+                        writer.AppendLine("Entity? entity;");
+                        using (writer.BeginScope("if (string.IsNullOrEmpty(alias))"))
                         {
-                            writer.AppendLine($"entity = source;");
+                            writer.AppendLine("entity = source;");
                         }
-                        using (writer.BeginScope($"else"))
+                        using (writer.BeginScope("else"))
                         {
-                            writer.AppendLine($"entity = source.GetAliasedEntity(alias);");
-                            writer.AppendLine($"if (entity is null) return null;");
+                            writer.AppendLine("entity = source.GetAliasedEntity(alias);");
+                            writer.AppendLine("if (entity is null) return null;");
                         }
-                        writer.AppendLine($"if (entity?.LogicalName != entityname)");
-                        writer.AppendLine($"throw new ArgumentException($\"entity LogicalName expected to be {{entityname}} recived: {{entity?.LogicalName}}\",\"entity\");");
+                        writer.AppendLine("if (entity?.LogicalName != entityname)");
+                        writer.AppendLine("throw new ArgumentException($\"entity LogicalName expected to be {{entityname}} recived: {{entity?.LogicalName}}\",\"entity\");");
                         writer.AppendLine($"var {modelName} = new {className}();");
                         writer.AppendLine(toModelContent.ToString());
                         writer.AppendLine($"return {modelName};");
@@ -422,11 +422,12 @@ namespace DynamicsMapper
 
         private static Mappings? GenerateLinkMappings(string modelName, FieldGenerationDetails attribute, ICollection<MapperDetails> createdMappers, SourceProductionContext ctx)
         {
-            var typeSymbol = attribute.PropertySymbol.Type.GetUnelyingType().Name;
-            var syntaxReference = attribute.PropertySymbol.Type.DeclaringSyntaxReferences.FirstOrDefault()
-                ?? throw new Exception("syntaxReference not found");
-            if (syntaxReference.GetSyntax() is not ClassDeclarationSyntax mapperSyntax)
-                throw new Exception("syntax is not  ClassDeclarationSyntax");
+            var syntaxReference = attribute.PropertySymbol.Type.DeclaringSyntaxReferences.FirstOrDefault();
+            if (syntaxReference?.GetSyntax() is not ClassDeclarationSyntax mapperSyntax)
+            {
+                attribute.PropertySymbol.SetDiagnostic(ctx, DiagnosticsDescriptors.LinkMustBeUsedOnClass, attribute.PropertySymbol.Type.ToDisplayString());
+                return null;
+            }
 
             var mapperNameSpace = mapperSyntax.GetParent<BaseNamespaceDeclarationSyntax>()!.Name.ToString();
             var foundLinkDetails = createdMappers.Where(m => m.ClassDeclarationSyntax == mapperSyntax);

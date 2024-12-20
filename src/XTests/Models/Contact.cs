@@ -79,5 +79,13 @@ namespace XTests.Models
         public string RegardingIdTarget => "account";
         [CrmField("regardingobjectid", Mapping = MappingType.Formatted)]
         public string? RegardingName { get; set; }
+
+        [CrmLink("break")]
+        public string? Break { get; set; }
+    }
+
+    public class Fake
+    {
+
     }
 }
