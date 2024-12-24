@@ -12,7 +12,7 @@
 
     <PackageProjectUrl>https://github.com/YonatanCohavi/DynamicsMapper</PackageProjectUrl>
     <PackageId>YC.DynamicsMapper</PackageId>
-    <PackageVersion>2.1.1.2</PackageVersion>
+    <PackageVersion>2.1.2.0</PackageVersion>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageDescription>
       A .NET source generator for generating dynamics crm Enity mappings.
@@ -28,6 +28,7 @@
       * Supporst unequal names between Model and destination
       * Strong named DynamicsMapper.FastMappers
       * FastMapper is exposing Columnset
+      * FastMapper mapping nullable value to non nullable value is now supported
     </PackageReleaseNotes>
   </PropertyGroup>
 

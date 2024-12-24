@@ -259,13 +259,14 @@ namespace DynamicsMapper.FastMappers
                 }
                 if (crmField.Mapping == MappingType.DynamicLookupTarget)
                     continue;
+
                 Expression value = crmField.Mapping switch
                 {
-                    MappingType.Basic or 0 => BasicMapperExpressions.ToEntity(settingsInput, propertyExpression, property.PropertyType),
+                    MappingType.Basic or 0 => BasicMapperExpressions.ToEntity(settingsInput, propertyExpression, member.Destination.PropertyType),
                     MappingType.Lookup => LookupMapperExpressions.ToEntity(settingsInput, propertyExpression, targetExpression),
                     MappingType.Money => MoneyMapperExpressions.ToEntity(settingsInput, propertyExpression),
-                    MappingType.Options => OptionsMapperExpressions.ToEntity(settingsInput, propertyExpression, property.PropertyType),
-                    MappingType.MultipleOptions => MultipleOptionsMappersExpressions.ToEntity(settingsInput, propertyExpression, property.PropertyType),
+                    MappingType.Options => OptionsMapperExpressions.ToEntity(settingsInput, propertyExpression, member.Destination.PropertyType),
+                    MappingType.MultipleOptions => MultipleOptionsMappersExpressions.ToEntity(settingsInput, propertyExpression, member.Destination.PropertyType),
                     MappingType.PrimaryId => PrimaryIdMapperExpressions.ToEntity(settingsInput, propertyExpression),
                     MappingType.DynamicLookup => LookupMapperExpressions.ToEntity(settingsInput, propertyExpression, targetExpression),
                     MappingType.DynamicLookupTarget => throw new NotImplementedException(),
